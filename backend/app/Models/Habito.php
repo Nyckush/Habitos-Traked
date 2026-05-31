@@ -12,6 +12,15 @@ class Habito extends Model
 {
     use HasFactory;
 
+    protected static function booted(): void
+    {
+        static::creating(function (self $habito): void {
+            if (blank($habito->fecha_creacion)) {
+                $habito->fecha_creacion = now()->toDateString();
+            }
+        });
+    }
+
     /**
      * @var list<string>
      */
@@ -44,7 +53,11 @@ class Habito extends Model
     {
         return $this->belongsToMany(Rutina::class, 'rutina_habitos')
             ->using(RutinaHabito::class)
-            ->withPivot('orden');
+            ->withPivot([
+                'hora_inicio',
+                'duracion_estimada',
+                'orden',
+            ]);
     }
 
     public function registrosHabito(): HasMany

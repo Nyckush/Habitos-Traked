@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Rutinas;
 use App\Filament\Resources\Rutinas\Pages\CreateRutina;
 use App\Filament\Resources\Rutinas\Pages\EditRutina;
 use App\Filament\Resources\Rutinas\Pages\ListRutinas;
+use App\Filament\Resources\Rutinas\RelationManagers\HabitosRelationManager;
 use App\Filament\Resources\Rutinas\Schemas\RutinaForm;
 use App\Filament\Resources\Rutinas\Tables\RutinasTable;
 use App\Models\Rutina;
@@ -44,7 +45,7 @@ class RutinaResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            HabitosRelationManager::class,
         ];
     }
 

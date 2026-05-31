@@ -15,8 +15,20 @@ class RutinaHabito extends Pivot
     protected $fillable = [
         'rutina_id',
         'habito_id',
+        'hora_inicio',
+        'duracion_estimada',
         'orden',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'duracion_estimada' => 'integer',
+        ];
+    }
 
     public function rutina(): BelongsTo
     {

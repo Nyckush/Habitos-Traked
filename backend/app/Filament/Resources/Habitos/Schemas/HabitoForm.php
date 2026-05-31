@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Habitos\Schemas;
 
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -36,8 +35,6 @@ class HabitoForm
                     ->required(),
                 Toggle::make('activo')
                     ->default(true)
-                    ->required(),
-                DatePicker::make('fecha_creacion')
                     ->required(),
             ]);
     }

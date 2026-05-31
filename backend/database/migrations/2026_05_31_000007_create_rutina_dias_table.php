@@ -11,15 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('rutina_habitos', function (Blueprint $table) {
+        Schema::create('rutina_dias', function (Blueprint $table) {
             $table->id();
             $table->foreignId('rutina_id')->constrained('rutinas')->cascadeOnDelete();
-            $table->foreignId('habito_id')->constrained('habitos')->cascadeOnDelete();
-            $table->time('hora_inicio')->nullable();
-            $table->unsignedInteger('duracion_estimada');
-            $table->unsignedInteger('orden');
+            $table->string('dia_semana', 15);
 
-            $table->unique(['rutina_id', 'habito_id']);
+            $table->unique(['rutina_id', 'dia_semana']);
         });
     }
 
@@ -28,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('rutina_habitos');
+        Schema::dropIfExists('rutina_dias');
     }
 };
