@@ -26,3 +26,5 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www
 
 COPY . /var/www
+
+RUN composer install --no-interaction --optimize-autoloader --no-dev
