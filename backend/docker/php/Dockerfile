@@ -1,4 +1,4 @@
-FROM php:8.3-fpm
+FROM php:8.4-fpm
 
 RUN apt-get update && apt-get install -y \
     git \
@@ -19,6 +19,12 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www
 
 COPY . /var/www
+
+# If the build context is the repo root, Laravel ends up in /var/www/backend.
+# Normalize it so composer.json is always at /var/www.
+RUN if [ ! -f /var/www/composer.json ] && [ -f /var/www/backend/composer.json ]; then \
+            cp -a /var/www/backend/. /var/www/; \
+        fi
 
 COPY docker/php/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
