@@ -46,3 +46,13 @@ Opcional seed:
 ## Notas
 - El codigo se monta en volumen (`./backend:/var/www`), por eso cualquier cambio local se refleja de inmediato.
 - Si cambias extensiones de PHP en el Dockerfile, reconstruye: `docker compose up -d --build`.
+
+## EasyPanel (importante)
+Si despliegas con Dockerfile en EasyPanel, usa estos valores:
+- Build context / Ruta de compilacion: `backend`
+- Dockerfile path: `docker/php/Dockerfile`
+
+Si usas como Dockerfile path `backend/docker/php/Dockerfile`, entonces el contexto debe ser la raiz del repo.
+La combinacion recomendada y mas simple es:
+- Contexto: `backend`
+- Dockerfile: `docker/php/Dockerfile`

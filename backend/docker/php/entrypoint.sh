@@ -1,13 +1,19 @@
 #!/bin/sh
 set -e
 
-cd /var/www
+APP_DIR="/var/www"
+
+if [ ! -f "$APP_DIR/composer.json" ] && [ -f "$APP_DIR/backend/composer.json" ]; then
+  APP_DIR="$APP_DIR/backend"
+fi
+
+cd "$APP_DIR"
 
 if [ ! -f .env ] && [ -f .env.example ]; then
   cp .env.example .env
 fi
 
-if [ ! -d vendor ]; then
+if [ -f composer.json ] && [ ! -d vendor ]; then
   composer install --no-interaction --prefer-dist
 fi
 
