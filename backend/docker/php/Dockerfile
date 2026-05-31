@@ -1,33 +1,26 @@
 FROM php:8.4-fpm
 
+# Instalar dependencias del sistema y extensiones de PHP requeridas por Laravel
 RUN apt-get update && apt-get install -y \
     git \
-    unzip \
-    libzip-dev \
+    curl \
     libpng-dev \
-    libjpeg62-turbo-dev \
-    libfreetype6-dev \
-    libicu-dev \
     libonig-dev \
     libxml2-dev \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) pdo_mysql mbstring bcmath pcntl exif gd intl zip \
-    && rm -rf /var/lib/apt/lists/*
+    zip \
+    unzip \
+    libzip-dev \
+    libicu-dev
 
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+# Limpiar cache de instalación
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Instalar extensiones de PHP
+RUN docker-php-ext-configure intl \
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip intl
+
+# Conseguir la última versión de Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Definir el directorio de trabajo
 WORKDIR /var/www
-
-COPY . /var/www
-
-# If the build context is the repo root, Laravel ends up in /var/www/backend.
-# Normalize it so composer.json is always at /var/www.
-RUN if [ ! -f /var/www/composer.json ] && [ -f /var/www/backend/composer.json ]; then \
-            cp -a /var/www/backend/. /var/www/; \
-        fi
-
-COPY docker/php/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
-
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["php-fpm"]

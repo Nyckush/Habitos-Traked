@@ -1,12 +1,14 @@
+version: '3.8'
+
 services:
   app:
     build:
-      context: ./backend
+      context: .
       dockerfile: docker/php/Dockerfile
     container_name: habitos_app
     working_dir: /var/www
     volumes:
-      - ./backend:/var/www
+      - .:/var/www
     depends_on:
       db:
         condition: service_healthy
@@ -19,8 +21,8 @@ services:
     ports:
       - "8080:80"
     volumes:
-      - ./backend:/var/www
-      - ./backend/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - .:/var/www
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - app
     networks:
@@ -32,7 +34,7 @@ services:
     ports:
       - "3307:3306"
     environment:
-      MYSQL_DATABASE: habitos_traked
+      MYSQL_DATABASE: habitos_tracked
       MYSQL_USER: laravel
       MYSQL_PASSWORD: laravel
       MYSQL_ROOT_PASSWORD: root
@@ -42,7 +44,7 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
     networks:
       - habitos_net
 
