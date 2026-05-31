@@ -24,3 +24,5 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Definir el directorio de trabajo
 WORKDIR /var/www
+
+COPY . /var/www
