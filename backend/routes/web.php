@@ -1,12 +1,11 @@
 <?php
 
-use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     if (auth()->check()) {
-        return redirect()->to(Filament::getPanel('admin')->getUrl());
+        return redirect()->to(url('/admin/mis-rutinas-hoy'));
     }
 
-    return view('welcome');
+    return redirect()->to(url('/admin/login'));
 });
