@@ -1,4 +1,3 @@
-
 FROM php:8.4-fpm
 
 # 1. INSTALAR DEPENDENCIAS (Incluyendo Nginx e ICU para intl)
@@ -31,10 +30,10 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # 4. CONFIGURAR NGINX Y PHP
 RUN rm -f /etc/nginx/sites-enabled/default
-COPY docker/nginx.conf /etc/nginx/nginx.conf
+COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf
 
 RUN mkdir -p /usr/local/etc/php/conf.d/
-COPY docker/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+COPY docker/nginx/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
 
 # Configurar PHP-FPM para que escuche en el puerto local
 RUN sed -i 's|listen = .*|listen = 127.0.0.1:9000|' /usr/local/etc/php-fpm.d/www.conf
@@ -61,6 +60,6 @@ RUN chmod -R 755 public
 
 # 10. CONFIGURAR EL ENTRYPOINT DE ARRANQUE
 EXPOSE 80
-COPY docker/entrypoint.sh /entrypoint.sh
+COPY docker/nginx/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
