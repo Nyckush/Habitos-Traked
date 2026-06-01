@@ -27,6 +27,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->profile()
             ->login()
             ->homeUrl('/admin/mis-rutinas-hoy')
             ->brandLogo(asset('logoModoDia.png'))
