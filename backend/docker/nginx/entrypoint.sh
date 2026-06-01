@@ -37,12 +37,12 @@ echo "--- Re-ajustando permisos post-cache ---"
 chown -R www-data:www-data storage bootstrap/cache
 chmod -R 775 storage bootstrap/cache
 
-echo "--- Iniciando PHP-FPM en modo daemon ---"
-php-fpm -D
+echo "--- Iniciando PHP-FPM en primer plano ---"
+# Quitamos el -D para que PHP-FPM se quede corriendo y mantenga vivo el contenedor
+php-fpm &
 
 echo "--- Verificando la configuración de Nginx ---"
 nginx -t
 
 echo "--- Iniciando Nginx en primer plano ---"
-# Usamos comillas simples para evitar cualquier problema de interpretación
 nginx -g 'daemon off;'
