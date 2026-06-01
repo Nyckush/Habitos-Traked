@@ -31,18 +31,7 @@
     @endphp
 
     <div class="mrh-root">
-        <header class="mrh-topbar">
-            <div class="mrh-topbar-title">Rutinas de Hoy</div>
-            <div class="mrh-topbar-tools">
-                <button class="mrh-icon-btn" type="button" aria-label="Notificaciones">
-                    <span>•</span>
-                </button>
-                <button class="mrh-icon-btn" type="button" aria-label="Configuracion">
-                    <span>••</span>
-                </button>
-                <div class="mrh-avatar">{{ strtoupper(substr((string) auth()->user()?->nombre, 0, 2)) }}</div>
-            </div>
-        </header>
+    
 
         <div class="mrh-page">
             <section class="mrh-center">

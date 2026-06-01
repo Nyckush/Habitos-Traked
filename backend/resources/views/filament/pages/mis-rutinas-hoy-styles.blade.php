@@ -1,10 +1,10 @@
 <style>
     .mrh-root {
-        --mrh-bg: #faf8ff;
+       
         --mrh-surface: #ffffff;
         --mrh-surface-soft: #f4f6ff;
         --mrh-surface-variant: #dae2fd;
-        --mrh-border: #bcc9c6;
+       
         --mrh-text: #131b2e;
         --mrh-muted: #3d4947;
         --mrh-primary: #00685f;
@@ -21,11 +21,11 @@
     }
 
     .dark .mrh-root {
-        --mrh-bg: #111827;
+        
         --mrh-surface: #1f2937;
         --mrh-surface-soft: #111827;
         --mrh-surface-variant: #283044;
-        --mrh-border: #374151;
+      
         --mrh-text: #eef0ff;
         --mrh-muted: #9ca3af;
         --mrh-primary: #6bd8cb;

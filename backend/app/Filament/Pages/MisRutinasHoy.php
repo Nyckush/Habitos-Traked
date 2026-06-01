@@ -9,12 +9,15 @@ use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Contracts\Support\Htmlable;
 
 class MisRutinasHoy extends Page
 {
     protected static ?string $navigationLabel = 'Mis Rutinas de Hoy';
 
-    protected static ?string $title = 'Mis Rutinas de Hoy';
+    protected static ?string $title = null;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     protected string $view = 'filament.pages.mis-rutinas-hoy';
 
@@ -37,6 +40,11 @@ class MisRutinasHoy extends Page
      * @var list<int>
      */
     public array $habitosDelDia = [];
+
+    public function getHeading(): string|Htmlable|null
+    {
+        return null;
+    }
 
     public function mount(): void
     {
