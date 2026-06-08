@@ -81,6 +81,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(Rutina::class);
     }
 
+    public function tareas(): HasMany
+    {
+        return $this->hasMany(Tarea::class);
+    }
+
     public function canAccessPanel(Panel $panel): bool
     {
         return true;

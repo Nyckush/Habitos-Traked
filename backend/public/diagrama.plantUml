@@ -1,0 +1,125 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+
+class User {
+  +id : bigint
+  +nombre : string
+  +email : string
+  +password : string
+  +remember_token : string
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+class Habito {
+  +id : bigint
+  +user_id : bigint
+  +nombre : string
+  +frecuencia : string
+  +activo : boolean
+  +fecha_creacion : date
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+class Rutina {
+  +id : bigint
+  +user_id : bigint
+  +nombre : string
+  +descripcion : text
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+class RutinaDia {
+  +id : bigint
+  +rutina_id : bigint
+  +dia_semana : string
+}
+
+class RutinaHabito {
+  +id : bigint
+  +rutina_id : bigint
+  +habito_id : bigint
+  +hora_inicio : time
+  +duracion_estimada : unsigned int
+  +orden : unsigned int
+}
+
+class RegistroHabito {
+  +id : bigint
+  +habito_id : bigint
+  +fecha : date
+  +completado : boolean
+  +observacion : text
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+class Meta {
+  +id : bigint
+  +titulo : string
+  +motivo : text
+  +objetivo : unsigned int
+  +fecha_inicio : date
+  +fecha_limite : date
+  +estado : string
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+class HabitoMeta {
+  +id : bigint
+  +habito_id : bigint
+  +meta_id : bigint
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+class Tarea {
+  +id : bigint
+  +user_id : bigint
+  +meta_id : bigint
+  +titulo : string
+  +descripcion : text
+  +fecha_vencimiento : datetime
+  +prioridad : enum
+  +estado : enum
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+class ActividadHabito {
+  +id : bigint
+  +habito_id : bigint
+  +nombre : string
+  +orden : unsigned int
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+User "1" --> "0..*" Habito : hasMany
+User "1" --> "0..*" Rutina : hasMany
+User "1" --> "0..*" Tarea : hasMany
+
+Habito "1" --> "0..*" RegistroHabito : hasMany
+Habito "1" --> "0..*" ActividadHabito : hasMany
+Habito "0..*" --> "0..*" Rutina : belongsToMany via RutinaHabito
+Habito "0..*" --> "0..*" Meta : belongsToMany via HabitoMeta
+
+Rutina "1" --> "0..*" RutinaDia : hasMany
+Rutina "0..*" --> "0..*" Habito : belongsToMany via RutinaHabito
+
+Meta "0..*" --> "0..*" Habito : belongsToMany via HabitoMeta
+Meta "1" --> "0..*" Tarea : hasMany
+
+Tarea "0..1" --> "1" Meta : belongsTo
+RegistroHabito "1" --> "1" Habito : belongsTo
+ActividadHabito "1" --> "1" Habito : belongsTo
+RutinaHabito "1" --> "1" Rutina : belongsTo
+RutinaHabito "1" --> "1" Habito : belongsTo
+HabitoMeta "1" --> "1" Habito : belongsTo
+HabitoMeta "1" --> "1" Meta : belongsTo
+
+@enduml

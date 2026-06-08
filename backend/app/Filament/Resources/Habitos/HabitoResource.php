@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Habitos;
 use App\Filament\Resources\Habitos\Pages\CreateHabito;
 use App\Filament\Resources\Habitos\Pages\EditHabito;
 use App\Filament\Resources\Habitos\Pages\ListHabitos;
+use App\Filament\Resources\Habitos\RelationManagers\ActividadesRelationManager;
 use App\Filament\Resources\Habitos\Schemas\HabitoForm;
 use App\Filament\Resources\Habitos\Tables\HabitosTable;
 use App\Models\Habito;
@@ -44,7 +45,7 @@ class HabitoResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            ActividadesRelationManager::class,
         ];
     }
 

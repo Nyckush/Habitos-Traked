@@ -31,13 +31,13 @@
     @endphp
 
     <div class="mrh-root">
-    
-
-        <div class="mrh-page">
-            <section class="mrh-center">
-                <h1 class="mrh-date-title">{{ now()->translatedFormat('l, d M') }}</h1>
+        <div class="mrh-main-layout">
+            <div class="mrh-page">
+                <section class="mrh-center">
+                    <div class="mrh-date-info">
+                    <h1 class="mrh-date-title">{{ now()->translatedFormat('l, d M') }}</h1>
                 <p class="mrh-date-sub">{{ $this->completadosHoy }} de {{ $this->totalHabitos }} completados</p>
-
+                    </div>
                 <div class="mrh-ring">
                     <svg class="mrh-ring-svg" viewBox="0 0 100 100" aria-hidden="true">
                         <circle class="mrh-ring-bg" cx="50" cy="50" fill="transparent" r="40" stroke-width="8"></circle>
@@ -119,7 +119,7 @@
                                         <button
                                             type="button"
                                             class="mrh-check {{ $completado ? 'mrh-check-done' : '' }}"
-                                            wire:click="$toggle('estado.{{ $habito->id }}')"
+                                            wire:click="alternarHabito({{ $habito->id }})"
                                             aria-label="Marcar habito"
                                         >
                                             {{ $completado ? '✓' : '' }}
@@ -136,31 +136,27 @@
                                             </div>
                                         </div>
                                     </div>
-
-                                    <x-filament::button
-                                        wire:click="guardarHabito({{ $habito->id }})"
-                                        size="sm"
-                                        color="gray"
-                                    >
-                                        Guardar
-                                    </x-filament::button>
                                 </div>
 
-                                <textarea
-                                    wire:model.blur="observaciones.{{ $habito->id }}"
-                                    rows="2"
-                                    class="mrh-observation"
-                                    placeholder="Observacion opcional"
-                                ></textarea>
                             @empty
                                 <p class="mrh-muted">Esta rutina no tiene habitos activos relacionados.</p>
                             @endforelse
                         </div>
                     </article>
                 @empty
-                    <section class="mrh-card">
+                    <section class="mrh-card mrh-center">
                         <h3 class="mrh-routine-title">No tienes rutinas para hoy</h3>
                         <p class="mrh-muted">Crea una rutina y relaciona habitos para empezar tu seguimiento diario.</p>
+                        
+                        <x-filament::button 
+                            href="{{ \App\Filament\Resources\Rutinas\RutinaResource::getUrl('create') }}"
+                            tag="a"
+                            color="primary"
+                            icon="heroicon-m-plus"
+                            class="mt-4"
+                        >
+                            Crear mi primera rutina
+                        </x-filament::button>
                     </section>
                 @endforelse
             </section>
@@ -193,5 +189,96 @@
                 </x-filament::button>
             @endif
         </div>
-    </div>
+
+        <aside class="mrh-sidebar">
+            <h2 class="mrh-sidebar-title">Mis Metas</h2>
+            
+            @forelse ($this->metas as $meta)
+                @php
+                    $ejecuciones = $meta->contarEjecucionesCompletadas();
+                    $objetivo = max(1, $meta->objetivo);
+                    $progresoMeta = min(100, (int) floor(($ejecuciones / $objetivo) * 100));
+                @endphp
+
+                <article class="mrh-meta-card">
+                    <div class="mrh-meta-header">
+                        <h3 class="mrh-meta-title">{{ $meta->titulo }}</h3>
+                        <span class="mrh-meta-badge">{{ $meta->estado }}</span>
+                    </div>
+
+                    <div class="mrh-meta-progress-container">
+                        <div class="mrh-meta-progress-bar">
+                            <div 
+                                class="mrh-meta-progress-fill" 
+                                style="width: {{ $progresoMeta }}%"
+                            ></div>
+                        </div>
+                        <div class="mrh-meta-stats">
+                            <span>{{ $progresoMeta }}% completado</span>
+                            <span>{{ $ejecuciones }} / {{ $objetivo }}</span>
+                        </div>
+                    </div>
+                </article>
+            @empty
+                <div class="mrh-meta-card mrh-center">
+                    <p class="mrh-muted mb-4">No tienes metas activas en este momento.</p>
+                    
+                    <x-filament::button 
+                        href="{{ \App\Filament\Resources\Metas\MetaResource::getUrl('create') }}"
+                        tag="a"
+                        color="gray"
+                        icon="heroicon-m-flag"
+                        size="sm"
+                    >
+                        Crear mi primera meta
+                    </x-filament::button>
+                </div>
+            @endforelse
+
+<h2 class="mrh-sidebar-title"> Tareas Pendientes </h2>
+    @forelse ($this->tareasPendientes as $tarea)
+        <article class="mrh-meta-card">
+            <div class="mrh-meta-header">
+                <h3 class="mrh-meta-title">{{ $tarea->titulo }}</h3>
+                <span class="mrh-meta-badge">{{ $tarea->estado }}</span>
+            </div>
+
+            <div class="mrh-meta-progress-container">
+                <p>{{ $tarea->descripcion }}</p>
+                <div class="mrh-meta-stats">
+                    <span>Vence el {{ \Carbon\Carbon::parse($tarea->fecha_vencimiento)->translatedFormat('d M Y') }}</span>
+                    @if (in_array($tarea->estado, ['PENDIENTE', 'EN_PROGRESO'], true))
+                        <x-filament::button
+                            wire:click="completarTarea({{ $tarea->id }})"
+                            size="sm"
+                            color="primary"
+                            class="mt-3"
+                        >
+                            Marcar completada
+                        </x-filament::button>
+                    @endif
+                </div>
+            </div>
+        </article>
+    @empty
+        <div class="mrh-meta-card mrh-center">
+            <p class="mrh-muted mb-4">No tienes tareas pendientes para hoy.</p>
+
+            <x-filament::button 
+                href="{{ \App\Filament\Resources\Tareas\TareaResource::getUrl('create') }}"
+                tag="a"
+                color="gray"
+                icon="heroicon-m-clipboard-document"
+                size="sm"
+            >
+                Crear nueva tarea
+            </x-filament::button>
+        </div>
+    @endforelse
+
+
+            
+
+
+        </aside>
 </x-filament-panels::page>

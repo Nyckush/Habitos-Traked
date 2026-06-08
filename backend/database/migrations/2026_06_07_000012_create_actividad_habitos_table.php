@@ -11,14 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('habitos', function (Blueprint $table) {
+        Schema::create('actividad_habitos', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('habito_id')->constrained('habitos')->cascadeOnDelete();
             $table->string('nombre');
-            $table->string('frecuencia');
-            $table->boolean('activo')->default(true);
-            $table->date('fecha_creacion');
+            $table->unsignedInteger('orden')->default(1);
             $table->timestamps();
+
+            $table->index(['habito_id', 'orden']);
         });
     }
 
@@ -27,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('habitos');
+        Schema::dropIfExists('actividad_habitos');
     }
 };

@@ -3,8 +3,10 @@
 namespace App\Filament\Pages;
 
 use App\Models\Habito;
+use App\Models\Meta;
 use App\Models\RegistroHabito;
 use App\Models\Rutina;
+use App\Models\Tarea;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -15,9 +17,11 @@ class MisRutinasHoy extends Page
 {
     protected static ?string $navigationLabel = 'Mis Rutinas de Hoy';
 
-    protected static ?string $title = null;
+    protected static ?string $title = 'Mis Rutinas de Hoy';
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static ?string $slug = 'mis-rutinas-hoy';
+
+    protected static ?int $navigationSort = -1;
 
     protected string $view = 'filament.pages.mis-rutinas-hoy';
 
@@ -25,6 +29,11 @@ class MisRutinasHoy extends Page
      * @var EloquentCollection<int, Rutina>
      */
     public EloquentCollection $rutinas;
+
+    /**
+     * @var EloquentCollection<int, Meta>
+     */
+    public EloquentCollection $metas;
 
     /**
      * @var array<int, bool>
@@ -40,6 +49,11 @@ class MisRutinasHoy extends Page
      * @var list<int>
      */
     public array $habitosDelDia = [];
+
+    /**
+     * @var EloquentCollection<int, Tarea>
+     */
+    public EloquentCollection $tareasPendientes;
 
     public function getHeading(): string|Htmlable|null
     {
@@ -88,6 +102,38 @@ class MisRutinasHoy extends Page
     {
         $this->estado[$habitoId] = true;
         $this->guardarHabito($habitoId);
+    }
+
+    public function alternarHabito(int $habitoId): void
+    {
+        $this->estado[$habitoId] = ! ($this->estado[$habitoId] ?? false);
+        $this->guardarHabito($habitoId);
+    }
+
+    public function completarTarea(int $tareaId): void
+    {
+        $tarea = Tarea::query()
+            ->whereKey($tareaId)
+            ->where('user_id', auth()->id())
+            ->first();
+
+        if (! $tarea) {
+            Notification::make()
+                ->title('Tarea no encontrada para tu usuario')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $tarea->forceFill(['estado' => 'COMPLETADA'])->save();
+
+        Notification::make()
+            ->title('Tarea marcada como completada')
+            ->success()
+            ->send();
+
+        $this->cargarRutinas();
     }
 
     public function guardarTodo(): void
@@ -240,11 +286,35 @@ class MisRutinasHoy extends Page
             ->orderBy('nombre')
             ->get();
 
+        $this->metas = Meta::query()
+            ->whereHas('habitos', function ($query) {
+                $query->where('user_id', auth()->id());
+            })
+            ->where('estado', '!=', 'CANCELADA')
+            ->get();
+
         $this->habitosDelDia = $this->rutinas
             ->flatMap(fn (Rutina $rutina) => $rutina->habitos->pluck('id'))
             ->unique()
             ->values()
             ->all();
+
+        Tarea::query()
+            ->where('user_id', auth()->id())
+            ->whereIn('estado', ['PENDIENTE', 'EN_PROGRESO'])
+            ->whereNotNull('fecha_vencimiento')
+            ->where('fecha_vencimiento', '<', now())
+            ->update(['estado' => 'VENCIDA']);
+
+        $this->tareasPendientes = Tarea::query()
+            ->where('user_id', auth()->id())
+            ->whereIn('estado', ['PENDIENTE', 'EN_PROGRESO'])
+            ->where(function ($query) {
+                $query->whereNull('fecha_vencimiento')
+                    ->orWhere('fecha_vencimiento', '>=', now());
+            })
+            ->orderBy('fecha_vencimiento')
+            ->get();
 
         if ($this->habitosDelDia === []) {
             return;
@@ -282,4 +352,7 @@ class MisRutinasHoy extends Page
             default => 'lunes',
         };
     }
+   
+
+
 }

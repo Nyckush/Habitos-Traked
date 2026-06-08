@@ -4,7 +4,6 @@ namespace App\Filament\Resources\Habitos\Schemas;
 
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
@@ -21,10 +20,6 @@ class HabitoForm
                 TextInput::make('nombre')
                     ->required()
                     ->maxLength(255),
-                Textarea::make('descripcion')
-                    ->required()
-                    ->rows(3)
-                    ->columnSpanFull(),
                 Select::make('frecuencia')
                     ->options([
                         'diaria' => 'Diaria',

@@ -27,7 +27,6 @@ class Habito extends Model
     protected $fillable = [
         'user_id',
         'nombre',
-        'descripcion',
         'frecuencia',
         'activo',
         'fecha_creacion',
@@ -63,5 +62,17 @@ class Habito extends Model
     public function registrosHabito(): HasMany
     {
         return $this->hasMany(RegistroHabito::class);
+    }
+
+    public function metas(): BelongsToMany
+    {
+        return $this->belongsToMany(Meta::class, 'habito_metas')
+            ->withTimestamps();
+    }
+
+    public function actividades(): HasMany
+    {
+        return $this->hasMany(ActividadHabito::class)
+            ->orderBy('orden');
     }
 }
