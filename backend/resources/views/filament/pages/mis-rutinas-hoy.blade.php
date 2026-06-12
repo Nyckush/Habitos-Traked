@@ -268,7 +268,7 @@
                 href="{{ \App\Filament\Resources\Tareas\TareaResource::getUrl('create') }}"
                 tag="a"
                 color="gray"
-                icon="heroicon-m-clipboard"
+                icon="heroicon-m-clipboard-document"
                 size="sm"
             >
                 Crear nueva tarea

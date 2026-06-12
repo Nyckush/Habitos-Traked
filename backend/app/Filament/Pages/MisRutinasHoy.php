@@ -26,29 +26,29 @@ class MisRutinasHoy extends Page
     protected string $view = 'filament.pages.mis-rutinas-hoy';
 
     /**
-     * @var EloquentCollection<int, Rutina>
+     * @var mixed
      */
-    public EloquentCollection $rutinas;
+    public $rutinas;
 
     /**
-     * @var EloquentCollection<int, Meta>
+     * @var mixed
      */
-    public EloquentCollection $metas;
+    public $metas;
 
     /**
-     * @var array<int, bool>
+     * @var array
      */
-    public array $estado = [];
+    public $estado = [];
 
     /**
-     * @var array<int, string>
+     * @var array
      */
-    public array $observaciones = [];
+    public $observaciones = [];
 
     /**
-     * @var list<int>
+     * @var array
      */
-    public array $habitosDelDia = [];
+    public $habitosDelDia = [];
 
     /**
      * @var mixed
@@ -62,6 +62,9 @@ class MisRutinasHoy extends Page
 
     public function mount(): void
     {
+        $this->rutinas = collect();
+        $this->metas = collect();
+        $this->tareasPendientes = collect();
         $this->cargarRutinas();
     }
 
