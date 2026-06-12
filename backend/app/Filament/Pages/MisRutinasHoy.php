@@ -51,9 +51,9 @@ class MisRutinasHoy extends Page
     public array $habitosDelDia = [];
 
     /**
-     * @var EloquentCollection<int, Tarea>
+     * @var mixed
      */
-    public EloquentCollection $tareasPendientes;
+    public $tareasPendientes;
 
     public function getHeading(): string|Htmlable|null
     {
