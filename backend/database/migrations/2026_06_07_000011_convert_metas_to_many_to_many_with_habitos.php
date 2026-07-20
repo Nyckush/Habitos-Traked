@@ -58,6 +58,7 @@ return new class extends Migration
 
         Schema::table('metas', function (Blueprint $table) {
             $table->foreignId('habito_id')->nullable()->after('id')->constrained('habitos')->nullOnDelete();
+            $table->index(['habito_id', 'estado']);
         });
 
         $firstHabitoPerMeta = DB::table('habito_metas')
