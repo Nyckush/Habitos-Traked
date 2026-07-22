@@ -18,7 +18,6 @@ class Rutina extends Model
     protected $fillable = [
         'user_id',
         'nombre',
-        'descripcion',
     ];
 
     public function usuario(): BelongsTo
@@ -32,10 +31,9 @@ class Rutina extends Model
             ->using(RutinaHabito::class)
             ->withPivot([
                 'hora_inicio',
-                'duracion_estimada',
-                'orden',
             ])
-            ->orderByPivot('orden');
+            ->orderByRaw('CASE WHEN rutina_habitos.hora_inicio IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('rutina_habitos.hora_inicio');
     }
 
     public function rutinaDias(): HasMany

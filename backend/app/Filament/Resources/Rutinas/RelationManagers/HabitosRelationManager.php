@@ -6,7 +6,6 @@ use Filament\Actions\AttachAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DetachAction;
 use Filament\Actions\DetachBulkAction;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -26,17 +25,9 @@ class HabitosRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('nombre')
                     ->searchable(),
-                TextColumn::make('frecuencia')
-                    ->badge(),
                 TextColumn::make('pivot.hora_inicio')
                     ->label('Inicio')
-                    ->placeholder('-'),
-                TextColumn::make('pivot.duracion_estimada')
-                    ->label('Duracion estimada (min)')
-                    ->numeric(),
-                TextColumn::make('pivot.orden')
-                    ->label('Orden')
-                    ->numeric()
+                    ->placeholder('-')
                     ->sortable(),
             ])
             ->filters([
@@ -45,23 +36,14 @@ class HabitosRelationManager extends RelationManager
             ->headerActions([
                 AttachAction::make()
                     ->label('Relacionar habito')
+                    ->modalWidth('4xl')
+                    ->preloadRecordSelect()
                     ->recordSelectOptionsQuery(fn (Builder $query): Builder => $query->where('user_id', auth()->id()))
                     ->form(fn (AttachAction $action): array => [
                         $action->getRecordSelect(),
                         TimePicker::make('hora_inicio')
                             ->label('Hora inicio')
                             ->seconds(false),
-                        TextInput::make('duracion_estimada')
-                            ->label('Duracion estimada (min)')
-                            ->numeric()
-                            ->minValue(1)
-                            ->required(),
-                        TextInput::make('orden')
-                            ->label('Orden')
-                            ->numeric()
-                            ->minValue(1)
-                            ->default(1)
-                            ->required(),
                     ]),
             ])
             ->recordActions([

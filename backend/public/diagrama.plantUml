@@ -1,8 +1,9 @@
 @startuml
 skinparam classAttributeIconSize 0
 skinparam shadowing false
+hide methods
 
-class User {
+entity User {
   +id : bigint
   +nombre : string
   +email : string
@@ -12,55 +13,49 @@ class User {
   +updated_at : timestamp
 }
 
-class Habito {
+entity Habito {
   +id : bigint
   +user_id : bigint
   +nombre : string
-  +frecuencia : string
-  +activo : boolean
-  +fecha_creacion : date
   +created_at : timestamp
   +updated_at : timestamp
 }
 
-class Rutina {
+entity Rutina {
   +id : bigint
   +user_id : bigint
   +nombre : string
-  +descripcion : text
   +created_at : timestamp
   +updated_at : timestamp
 }
 
-class RutinaDia {
+entity RutinaDia {
   +id : bigint
   +rutina_id : bigint
   +dia_semana : string
 }
 
-class RutinaHabito {
+entity RutinaHabito {
   +id : bigint
   +rutina_id : bigint
   +habito_id : bigint
-  +hora_inicio : time
-  +duracion_estimada : unsigned int
-  +orden : unsigned int
+  +hora_inicio : time?
 }
 
-class RegistroHabito {
+entity RegistroHabito {
   +id : bigint
   +habito_id : bigint
   +fecha : date
   +completado : boolean
-  +observacion : text
+  +observacion : text?
   +created_at : timestamp
   +updated_at : timestamp
 }
 
-class Meta {
+entity Meta {
   +id : bigint
   +titulo : string
-  +motivo : text
+  +motivo : text?
   +objetivo : unsigned int
   +fecha_inicio : date
   +fecha_limite : date
@@ -69,7 +64,7 @@ class Meta {
   +updated_at : timestamp
 }
 
-class HabitoMeta {
+entity HabitoMeta {
   +id : bigint
   +habito_id : bigint
   +meta_id : bigint
@@ -77,20 +72,20 @@ class HabitoMeta {
   +updated_at : timestamp
 }
 
-class Tarea {
+entity Tarea {
   +id : bigint
   +user_id : bigint
-  +meta_id : bigint
+  +meta_id : bigint?
   +titulo : string
-  +descripcion : text
-  +fecha_vencimiento : datetime
+  +descripcion : text?
+  +fecha_vencimiento : datetime?
   +prioridad : enum
   +estado : enum
   +created_at : timestamp
   +updated_at : timestamp
 }
 
-class ActividadHabito {
+entity ActividadHabito {
   +id : bigint
   +habito_id : bigint
   +nombre : string
@@ -99,27 +94,32 @@ class ActividadHabito {
   +updated_at : timestamp
 }
 
-User "1" --> "0..*" Habito : hasMany
-User "1" --> "0..*" Rutina : hasMany
-User "1" --> "0..*" Tarea : hasMany
+User "1" -- "0..*" Habito : crea
+User "1" -- "0..*" Rutina : crea
+User "1" -- "0..*" Tarea : gestiona
 
-Habito "1" --> "0..*" RegistroHabito : hasMany
-Habito "1" --> "0..*" ActividadHabito : hasMany
-Habito "0..*" --> "0..*" Rutina : belongsToMany via RutinaHabito
-Habito "0..*" --> "0..*" Meta : belongsToMany via HabitoMeta
+Habito "1" -- "0..*" RegistroHabito : registra
+Habito "1" -- "0..*" ActividadHabito : contiene
+Rutina "1" -- "0..*" RutinaDia : programa
+Meta "1" -- "0..*" Tarea : deriva
 
-Rutina "1" --> "0..*" RutinaDia : hasMany
-Rutina "0..*" --> "0..*" Habito : belongsToMany via RutinaHabito
+Rutina "1" -- "0..*" RutinaHabito : vincula
+Habito "1" -- "0..*" RutinaHabito : participa
+Habito "1" -- "0..*" HabitoMeta : aporta
+Meta "1" -- "0..*" HabitoMeta : agrupa
 
-Meta "0..*" --> "0..*" Habito : belongsToMany via HabitoMeta
-Meta "1" --> "0..*" Tarea : hasMany
+Rutina "0..*" -- "0..*" Habito : many-to-many
+Habito "0..*" -- "0..*" Meta : many-to-many
+Meta "1" -- "0..1" Tarea : opcional
 
-Tarea "0..1" --> "1" Meta : belongsTo
-RegistroHabito "1" --> "1" Habito : belongsTo
-ActividadHabito "1" --> "1" Habito : belongsTo
-RutinaHabito "1" --> "1" Rutina : belongsTo
-RutinaHabito "1" --> "1" Habito : belongsTo
-HabitoMeta "1" --> "1" Habito : belongsTo
-HabitoMeta "1" --> "1" Meta : belongsTo
+note right of RutinaHabito
+  Tabla pivote entre Rutina y Habito
+  Atributos extra:
+  - hora_inicio
+end note
+
+note right of HabitoMeta
+  Tabla pivote entre Habito y Meta
+end note
 
 @enduml

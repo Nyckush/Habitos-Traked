@@ -63,8 +63,6 @@
                     <h2 class="mrh-card-title">{{ $habitoAtrasado['habito']->nombre }}</h2>
                     <p class="mrh-meta">
                         <span>{{ $habitoAtrasado['hora'] ? substr($habitoAtrasado['hora'], 0, 5) : 'Sin hora' }}</span>
-                        <span>|</span>
-                        <span>{{ $habitoAtrasado['habito']->pivot->duracion_estimada ?? '-' }} min</span>
                     </p>
 
                     <x-filament::button
@@ -86,8 +84,8 @@
                     </div>
 
                     <div>
-                        <div class="mrh-next-time">{{ $proximoHabito['habito']->pivot->duracion_estimada ?? '-' }}m</div>
-                        <p class="mrh-date-sub">estimado</p>
+                        <div class="mrh-next-time">{{ substr($proximoHabito['hora'], 0, 5) }}</div>
+                        <p class="mrh-date-sub">programado</p>
                     </div>
                 </section>
             @endif
@@ -131,7 +129,7 @@
                                                 @if ($atrasado)
                                                     Atrasado ({{ substr((string) $hora, 0, 5) }})
                                                 @else
-                                                    {{ $hora ? substr($hora, 0, 5) : 'Sin hora' }} | {{ $habito->pivot->duracion_estimada ?? '-' }} min
+                                                    {{ $hora ? substr($hora, 0, 5) : 'Sin hora' }}
                                                 @endif
                                             </div>
                                         </div>
@@ -139,7 +137,7 @@
                                 </div>
 
                             @empty
-                                <p class="mrh-muted">Esta rutina no tiene habitos activos relacionados.</p>
+                                <p class="mrh-muted">Esta rutina no tiene habitos relacionados.</p>
                             @endforelse
                         </div>
                     </article>

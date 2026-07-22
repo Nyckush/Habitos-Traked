@@ -3,9 +3,7 @@
 namespace App\Filament\Resources\Habitos\Schemas;
 
 use Filament\Forms\Components\Hidden;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
 
 class HabitoForm
@@ -20,17 +18,6 @@ class HabitoForm
                 TextInput::make('nombre')
                     ->required()
                     ->maxLength(255),
-                Select::make('frecuencia')
-                    ->options([
-                        'diaria' => 'Diaria',
-                        'semanal' => 'Semanal',
-                        'mensual' => 'Mensual',
-                        'personalizada' => 'Personalizada',
-                    ])
-                    ->required(),
-                Toggle::make('activo')
-                    ->default(true)
-                    ->required(),
             ]);
     }
 }

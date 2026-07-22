@@ -16,7 +16,6 @@ class CreateHabito extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['user_id'] = auth()->id();
-        $data['fecha_creacion'] = now()->toDateString();
 
         return $data;
     }

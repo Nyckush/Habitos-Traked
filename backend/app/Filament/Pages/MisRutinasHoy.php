@@ -283,8 +283,8 @@ class MisRutinasHoy extends Page
             ->whereHas('rutinaDias', fn ($query) => $query->where('dia_semana', $diaActual))
             ->with([
                 'habitos' => fn ($query) => $query
-                    ->where('habitos.activo', true)
-                    ->orderBy('rutina_habitos.orden'),
+                    ->orderByRaw('CASE WHEN rutina_habitos.hora_inicio IS NULL THEN 1 ELSE 0 END')
+                    ->orderBy('rutina_habitos.hora_inicio'),
             ])
             ->orderBy('nombre')
             ->get();

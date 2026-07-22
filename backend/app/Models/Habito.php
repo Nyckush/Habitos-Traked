@@ -12,36 +12,13 @@ class Habito extends Model
 {
     use HasFactory;
 
-    protected static function booted(): void
-    {
-        static::creating(function (self $habito): void {
-            if (blank($habito->fecha_creacion)) {
-                $habito->fecha_creacion = now()->toDateString();
-            }
-        });
-    }
-
     /**
      * @var list<string>
      */
     protected $fillable = [
         'user_id',
         'nombre',
-        'frecuencia',
-        'activo',
-        'fecha_creacion',
     ];
-
-    /**
-     * @return array<string, string>
-     */
-    protected function casts(): array
-    {
-        return [
-            'activo' => 'boolean',
-            'fecha_creacion' => 'date',
-        ];
-    }
 
     public function usuario(): BelongsTo
     {
@@ -54,8 +31,6 @@ class Habito extends Model
             ->using(RutinaHabito::class)
             ->withPivot([
                 'hora_inicio',
-                'duracion_estimada',
-                'orden',
             ]);
     }
 

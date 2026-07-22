@@ -16,6 +16,24 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npx expo start
    ```
 
+3. Configure the backend URL
+
+   Create a file named `.env` in the `apk` folder and add:
+
+   ```bash
+   EXPO_PUBLIC_API_URL=http://TU_BACKEND
+   ```
+
+   Example:
+
+   ```bash
+   EXPO_PUBLIC_API_URL=http://192.168.1.10:8000
+   ```
+
+   Then fully restart Expo after saving the file.
+
+   The mobile app uses this value from `src/services/api.ts` to call the Laravel API.
+
 In the output, you'll find options to open the app in a
 
 - [development build](https://docs.expo.dev/develop/development-builds/introduction/)
