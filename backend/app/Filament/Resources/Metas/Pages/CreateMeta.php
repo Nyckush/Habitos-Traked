@@ -8,9 +8,4 @@ use Filament\Resources\Pages\CreateRecord;
 class CreateMeta extends CreateRecord
 {
     protected static string $resource = MetaResource::class;
-
-    protected function afterCreate(): void
-    {
-        $this->record->recalcularEstadoPorObjetivo();
-    }
 }

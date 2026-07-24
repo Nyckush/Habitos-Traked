@@ -2,16 +2,18 @@
 
 namespace App\Filament\Pages;
 
+use App\Exports\SeguimientoHabitosExport;
 use App\Models\Habito;
-use App\Models\Meta;
+use App\Models\Objetivo;
 use App\Models\RegistroHabito;
 use App\Models\Rutina;
-use App\Models\Tarea;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Contracts\Support\Htmlable;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Maatwebsite\Excel\Facades\Excel;
 
 class MisRutinasHoy extends Page
 {
@@ -33,7 +35,7 @@ class MisRutinasHoy extends Page
     /**
      * @var mixed
      */
-    public $metas;
+    public $objetivos;
 
     /**
      * @var array
@@ -53,8 +55,6 @@ class MisRutinasHoy extends Page
     /**
      * @var mixed
      */
-    public $tareasPendientes;
-
     public function getHeading(): string|Htmlable|null
     {
         return null;
@@ -63,8 +63,7 @@ class MisRutinasHoy extends Page
     public function mount(): void
     {
         $this->rutinas = collect();
-        $this->metas = collect();
-        $this->tareasPendientes = collect();
+        $this->objetivos = collect();
         $this->cargarRutinas();
     }
 
@@ -113,32 +112,6 @@ class MisRutinasHoy extends Page
         $this->guardarHabito($habitoId);
     }
 
-    public function completarTarea(int $tareaId): void
-    {
-        $tarea = Tarea::query()
-            ->whereKey($tareaId)
-            ->where('user_id', auth()->id())
-            ->first();
-
-        if (! $tarea) {
-            Notification::make()
-                ->title('Tarea no encontrada para tu usuario')
-                ->danger()
-                ->send();
-
-            return;
-        }
-
-        $tarea->forceFill(['estado' => 'COMPLETADA'])->save();
-
-        Notification::make()
-            ->title('Tarea marcada como completada')
-            ->success()
-            ->send();
-
-        $this->cargarRutinas();
-    }
-
     public function guardarTodo(): void
     {
         foreach ($this->habitosDelDia as $habitoId) {
@@ -158,6 +131,19 @@ class MisRutinasHoy extends Page
             ->title('Rutinas de hoy actualizadas')
             ->success()
             ->send();
+    }
+
+    public function descargarPlanillaSeguimiento(): BinaryFileResponse
+    {
+        $usuario = auth()->user();
+        $fecha = now();
+        $nombreArchivo = 'seguimiento_habitos_' . $fecha->format('Y_m_d') . '.xlsx';
+
+        /** @var \App\Models\User $usuario */
+        return Excel::download(
+            new SeguimientoHabitosExport($usuario, $fecha),
+            $nombreArchivo,
+        );
     }
 
     public function getTotalHabitosProperty(): int
@@ -289,11 +275,10 @@ class MisRutinasHoy extends Page
             ->orderBy('nombre')
             ->get();
 
-        $this->metas = Meta::query()
-            ->whereHas('habitos', function ($query) {
-                $query->where('user_id', auth()->id());
-            })
-            ->where('estado', '!=', 'CANCELADA')
+        $this->objetivos = Objetivo::query()
+            ->where('user_id', auth()->id())
+            ->with('habito')
+            ->orderBy('fecha_limite')
             ->get();
 
         $this->habitosDelDia = $this->rutinas
@@ -301,23 +286,6 @@ class MisRutinasHoy extends Page
             ->unique()
             ->values()
             ->all();
-
-        Tarea::query()
-            ->where('user_id', auth()->id())
-            ->whereIn('estado', ['PENDIENTE', 'EN_PROGRESO'])
-            ->whereNotNull('fecha_vencimiento')
-            ->where('fecha_vencimiento', '<', now())
-            ->update(['estado' => 'VENCIDA']);
-
-        $this->tareasPendientes = Tarea::query()
-            ->where('user_id', auth()->id())
-            ->whereIn('estado', ['PENDIENTE', 'EN_PROGRESO'])
-            ->where(function ($query) {
-                $query->whereNull('fecha_vencimiento')
-                    ->orWhere('fecha_vencimiento', '>=', now());
-            })
-            ->orderBy('fecha_vencimiento')
-            ->get();
 
         if ($this->habitosDelDia === []) {
             return;
@@ -355,7 +323,4 @@ class MisRutinasHoy extends Page
             default => 'lunes',
         };
     }
-   
-
-
 }

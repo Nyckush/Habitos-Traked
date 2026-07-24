@@ -16,8 +16,6 @@ return new class extends Migration
             $table->foreignId('rutina_id')->constrained('rutinas')->cascadeOnDelete();
             $table->foreignId('habito_id')->constrained('habitos')->cascadeOnDelete();
             $table->time('hora_inicio')->nullable();
-            $table->unsignedInteger('duracion_estimada');
-            $table->unsignedInteger('orden');
 
             $table->unique(['rutina_id', 'habito_id']);
         });

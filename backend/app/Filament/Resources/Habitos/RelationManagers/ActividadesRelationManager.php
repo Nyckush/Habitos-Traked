@@ -29,9 +29,6 @@ class ActividadesRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('nombre')
                     ->searchable(),
-                TextColumn::make('orden')
-                    ->numeric()
-                    ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -46,11 +43,6 @@ class ActividadesRelationManager extends RelationManager
                         TextInput::make('nombre')
                             ->required()
                             ->maxLength(255),
-                        TextInput::make('orden')
-                            ->numeric()
-                            ->minValue(1)
-                            ->default(1)
-                            ->required(),
                     ]),
                 AssociateAction::make()
                     ->label('Relacionar actividad')

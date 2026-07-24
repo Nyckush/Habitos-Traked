@@ -4,8 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Meta extends Model
@@ -16,11 +15,15 @@ class Meta extends Model
      * @var list<string>
      */
     protected $fillable = [
-        'titulo',
-        'motivo',
-        'objetivo',
+        'user_id',
+        'nombre',
         'fecha_inicio',
-        'fecha_limite',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    protected $appends = [
         'estado',
     ];
 
@@ -30,61 +33,40 @@ class Meta extends Model
     protected function casts(): array
     {
         return [
-            'objetivo' => 'integer',
             'fecha_inicio' => 'date',
-            'fecha_limite' => 'date',
         ];
     }
 
-    public function getEjecucionesCompletadasAttribute(): int
+    public function usuario(): BelongsTo
     {
-        return $this->contarEjecucionesCompletadas();
+        return $this->belongsTo(User::class, 'user_id');
     }
 
-    public function contarEjecucionesCompletadas(): int
+    public function objetivos(): HasMany
     {
-        if (blank($this->fecha_inicio) || blank($this->fecha_limite) || blank($this->id)) {
-            return 0;
+        return $this->hasMany(Objetivo::class);
+    }
+
+    public function getEstadoAttribute(): string
+    {
+        $objetivos = $this->relationLoaded('objetivos')
+            ? $this->objetivos
+            : $this->objetivos()->get();
+
+        if ($objetivos->isEmpty()) {
+            return 'En Progreso';
         }
 
-        return RegistroHabito::query()
-            ->where('completado', true)
-            ->whereBetween('fecha', [
-                $this->fecha_inicio->toDateString(),
-                $this->fecha_limite->toDateString(),
-            ])
-            ->whereHas('habito.metas', fn (Builder $query): Builder => $query->whereKey($this->id))
-            ->count();
-    }
+        $estados = $objetivos->pluck('estado');
 
-    public function recalcularEstadoPorObjetivo(): void
-    {
-        if ($this->estado === 'CANCELADA') {
-            return;
+        if ($estados->every(fn (string $estado): bool => $estado === 'Realizado con Exito')) {
+            return 'Completada';
         }
 
-        $ejecuciones = $this->contarEjecucionesCompletadas();
-        $objetivo = max(1, (int) $this->objetivo);
-
-        $estado = $ejecuciones >= $objetivo
-            ? 'COMPLETADA'
-            : ($ejecuciones > 0 ? 'EN_PROGRESO' : 'PENDIENTE');
-
-        if ($this->estado === $estado) {
-            return;
+        if ($estados->contains(fn (string $estado): bool => in_array($estado, ['En Progreso', 'Completado Parcialmente'], true))) {
+            return 'En Progreso';
         }
 
-        $this->forceFill(['estado' => $estado])->saveQuietly();
-    }
-
-    public function habitos(): BelongsToMany
-    {
-        return $this->belongsToMany(Habito::class, 'habito_metas')
-            ->withTimestamps();
-    }
-
-    public function tareas(): HasMany
-    {
-        return $this->hasMany(Tarea::class);
+        return 'Incompleta';
     }
 }

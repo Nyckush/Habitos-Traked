@@ -15,10 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('habito_id')->constrained('habitos')->cascadeOnDelete();
             $table->string('nombre');
-            $table->unsignedInteger('orden')->default(1);
             $table->timestamps();
-
-            $table->index(['habito_id', 'orden']);
         });
     }
 

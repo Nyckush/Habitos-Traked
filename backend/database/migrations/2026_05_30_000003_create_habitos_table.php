@@ -15,9 +15,6 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->string('nombre');
-            $table->string('frecuencia');
-            $table->boolean('activo')->default(true);
-            $table->date('fecha_creacion');
             $table->timestamps();
         });
     }

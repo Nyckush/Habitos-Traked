@@ -39,15 +39,13 @@ class Habito extends Model
         return $this->hasMany(RegistroHabito::class);
     }
 
-    public function metas(): BelongsToMany
-    {
-        return $this->belongsToMany(Meta::class, 'habito_metas')
-            ->withTimestamps();
-    }
-
     public function actividades(): HasMany
     {
-        return $this->hasMany(ActividadHabito::class)
-            ->orderBy('orden');
+        return $this->hasMany(ActividadHabito::class);
+    }
+
+    public function objetivos(): HasMany
+    {
+        return $this->hasMany(Objetivo::class);
     }
 }

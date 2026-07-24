@@ -7,6 +7,7 @@ type DatabaseStatus = {
   version: number;
   usersCount: number;
   habitsCount: number;
+  routinesCount: number;
   queueCount: number;
 };
 

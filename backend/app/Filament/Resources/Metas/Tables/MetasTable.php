@@ -7,7 +7,6 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 class MetasTable
@@ -16,30 +15,19 @@ class MetasTable
     {
         return $table
             ->columns([
-                TextColumn::make('titulo')
+                TextColumn::make('nombre')
                     ->searchable(),
-                TextColumn::make('objetivo')
-                    ->numeric(decimalPlaces: 0),
-                TextColumn::make('avance')
-                    ->state(fn (Meta $record): string => $record->ejecuciones_completadas . ' / ' . (int) $record->objetivo)
-                    ->label('Avance'),
                 TextColumn::make('estado')
-                    ->badge(),
-                TextColumn::make('fecha_limite')
+                    ->badge()
+                    ->state(fn (Meta $record): string => $record->estado),
+                TextColumn::make('objetivos_count')
+                    ->counts('objetivos')
+                    ->label('Objetivos'),
+                TextColumn::make('fecha_inicio')
                     ->date(),
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('estado')
-                    ->options([
-                        'PENDIENTE' => 'Pendiente',
-                        'EN_PROGRESO' => 'En progreso',
-                        'COMPLETADA' => 'Completada',
-                        'CANCELADA' => 'Cancelada',
-                    ]),
+                //
             ])
             ->recordActions([
                 EditAction::make(),

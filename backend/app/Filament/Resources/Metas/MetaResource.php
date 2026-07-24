@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Metas;
 use App\Filament\Resources\Metas\Pages\CreateMeta;
 use App\Filament\Resources\Metas\Pages\EditMeta;
 use App\Filament\Resources\Metas\Pages\ListMetas;
+use App\Filament\Resources\Metas\RelationManagers\ObjetivosRelationManager;
 use App\Filament\Resources\Metas\Schemas\MetaForm;
 use App\Filament\Resources\Metas\Tables\MetasTable;
 use App\Models\Meta;
@@ -39,13 +40,14 @@ class MetaResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->whereHas('habitos', fn (Builder $query): Builder => $query->where('user_id', auth()->id()));
+            ->where('user_id', auth()->id())
+            ->with('objetivos');
     }
 
     public static function getRelations(): array
     {
         return [
-            //
+            ObjetivosRelationManager::class,
         ];
     }
 

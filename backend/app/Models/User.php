@@ -82,9 +82,14 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(Rutina::class);
     }
 
-    public function tareas(): HasMany
+    public function objetivos(): HasMany
     {
-        return $this->hasMany(Tarea::class);
+        return $this->hasMany(Objetivo::class);
+    }
+
+    public function metas(): HasMany
+    {
+        return $this->hasMany(Meta::class);
     }
 
     public function canAccessPanel(Panel $panel): bool

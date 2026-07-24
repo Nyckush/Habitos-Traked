@@ -21,18 +21,7 @@ class ActividadHabito extends Model
     protected $fillable = [
         'habito_id',
         'nombre',
-        'orden',
     ];
-
-    /**
-     * @return array<string, string>
-     */
-    protected function casts(): array
-    {
-        return [
-            'orden' => 'integer',
-        ];
-    }
 
     public function habito(): BelongsTo
     {

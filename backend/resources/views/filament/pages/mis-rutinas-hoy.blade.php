@@ -189,94 +189,66 @@
         </div>
 
         <aside class="mrh-sidebar">
-            <h2 class="mrh-sidebar-title">Mis Metas</h2>
+            <div class="mrh-meta-card mrh-center">
+                <h2 class="mrh-sidebar-title">Exportar seguimiento</h2>
+                <p class="mrh-muted mb-4">
+                    Descarga una planilla Excel con tus objetivos y el cumplimiento semanal de tus habitos.
+                </p>
+
+                <x-filament::button
+                    wire:click="descargarPlanillaSeguimiento"
+                    color="primary"
+                    icon="heroicon-m-arrow-down-tray"
+                    class="w-full"
+                >
+                    Descargar planilla Excel
+                </x-filament::button>
+            </div>
+
+            <h2 class="mrh-sidebar-title">Mis Objetivos</h2>
             
-            @forelse ($this->metas as $meta)
+            @forelse ($this->objetivos as $objetivo)
                 @php
-                    $ejecuciones = $meta->contarEjecucionesCompletadas();
-                    $objetivo = max(1, $meta->objetivo);
-                    $progresoMeta = min(100, (int) floor(($ejecuciones / $objetivo) * 100));
+                    $progresoObjetivo = min(100, (int) floor($objetivo->tasa_exito));
                 @endphp
 
                 <article class="mrh-meta-card">
                     <div class="mrh-meta-header">
-                        <h3 class="mrh-meta-title">{{ $meta->titulo }}</h3>
-                        <span class="mrh-meta-badge">{{ $meta->estado }}</span>
+                        <h3 class="mrh-meta-title">{{ $objetivo->nombre }}</h3>
+                        <span class="mrh-meta-badge">{{ $objetivo->estado }}</span>
                     </div>
 
                     <div class="mrh-meta-progress-container">
                         <div class="mrh-meta-progress-bar">
                             <div 
                                 class="mrh-meta-progress-fill" 
-                                style="width: {{ $progresoMeta }}%"
+                                style="width: {{ $progresoObjetivo }}%"
                             ></div>
                         </div>
                         <div class="mrh-meta-stats">
-                            <span>{{ $progresoMeta }}% completado</span>
-                            <span>{{ $ejecuciones }} / {{ $objetivo }}</span>
+                            <span>{{ $progresoObjetivo }}% completado</span>
+                            <span>{{ $objetivo->meta_actual }} / {{ $objetivo->meta_esperada }}</span>
+                        </div>
+                        <div class="mrh-meta-stats">
+                            <span>{{ $objetivo->habito?->nombre ?? 'Sin habito' }}</span>
+                            <span>Hasta {{ $objetivo->fecha_limite?->translatedFormat('d M Y') }}</span>
                         </div>
                     </div>
                 </article>
             @empty
                 <div class="mrh-meta-card mrh-center">
-                    <p class="mrh-muted mb-4">No tienes metas activas en este momento.</p>
+                    <p class="mrh-muted mb-4">No tienes objetivos activos en este momento.</p>
                     
                     <x-filament::button 
-                        href="{{ \App\Filament\Resources\Metas\MetaResource::getUrl('create') }}"
+                        href="{{ \App\Filament\Resources\Objetivos\ObjetivoResource::getUrl('create') }}"
                         tag="a"
                         color="gray"
                         icon="heroicon-m-flag"
                         size="sm"
                     >
-                        Crear mi primera meta
+                        Crear mi primer objetivo
                     </x-filament::button>
                 </div>
             @endforelse
-
-<h2 class="mrh-sidebar-title"> Tareas Pendientes </h2>
-    @forelse ($this->tareasPendientes as $tarea)
-        <article class="mrh-meta-card">
-            <div class="mrh-meta-header">
-                <h3 class="mrh-meta-title">{{ $tarea->titulo }}</h3>
-                <span class="mrh-meta-badge">{{ $tarea->estado }}</span>
-            </div>
-
-            <div class="mrh-meta-progress-container">
-                <p>{{ $tarea->descripcion }}</p>
-                <div class="mrh-meta-stats">
-                    <span>Vence el {{ \Carbon\Carbon::parse($tarea->fecha_vencimiento)->translatedFormat('d M Y') }}</span>
-                    @if (in_array($tarea->estado, ['PENDIENTE', 'EN_PROGRESO'], true))
-                        <x-filament::button
-                            wire:click="completarTarea({{ $tarea->id }})"
-                            size="sm"
-                            color="primary"
-                            class="mt-3"
-                        >
-                            Marcar completada
-                        </x-filament::button>
-                    @endif
-                </div>
-            </div>
-        </article>
-    @empty
-        <div class="mrh-meta-card mrh-center">
-            <p class="mrh-muted mb-4">No tienes tareas pendientes para hoy.</p>
-
-            <x-filament::button 
-                href="{{ \App\Filament\Resources\Tareas\TareaResource::getUrl('create') }}"
-                tag="a"
-                color="gray"
-                icon="heroicon-m-clipboard-document"
-                size="sm"
-            >
-                Crear nueva tarea
-            </x-filament::button>
-        </div>
-    @endforelse
-
-
-            
-
-
         </aside>
 </x-filament-panels::page>

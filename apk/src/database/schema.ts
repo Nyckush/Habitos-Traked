@@ -1,5 +1,5 @@
 export const DATABASE_NAME = 'habitracked.db';
-export const DATABASE_VERSION = 1;
+export const DATABASE_VERSION = 8;
 
 export const schemaStatements = [
   `
@@ -25,10 +25,7 @@ export const schemaStatements = [
       local_id TEXT PRIMARY KEY NOT NULL,
       remote_id INTEGER UNIQUE,
       user_remote_id INTEGER,
-      titulo TEXT NOT NULL,
-      descripcion TEXT,
-      estado TEXT NOT NULL DEFAULT 'activo',
-      frecuencia TEXT,
+      nombre TEXT NOT NULL,
       created_at TEXT,
       updated_at TEXT,
       deleted_at TEXT,
@@ -42,10 +39,59 @@ export const schemaStatements = [
       remote_id INTEGER UNIQUE,
       user_remote_id INTEGER,
       nombre TEXT NOT NULL,
-      descripcion TEXT,
       created_at TEXT,
       updated_at TEXT,
       deleted_at TEXT,
+      sync_status TEXT NOT NULL DEFAULT 'pending_create'
+        CHECK (sync_status IN ('synced', 'pending_create', 'pending_update', 'pending_delete', 'conflict'))
+    );
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS rutina_habitos (
+      local_id TEXT PRIMARY KEY NOT NULL,
+      remote_id INTEGER UNIQUE,
+      rutina_local_id TEXT NOT NULL,
+      habito_local_id TEXT NOT NULL,
+      hora_inicio TEXT,
+      sync_status TEXT NOT NULL DEFAULT 'pending_create'
+        CHECK (sync_status IN ('synced', 'pending_create', 'pending_update', 'pending_delete', 'conflict')),
+      UNIQUE(rutina_local_id, habito_local_id)
+    );
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS rutina_dias (
+      local_id TEXT PRIMARY KEY NOT NULL,
+      remote_id INTEGER UNIQUE,
+      rutina_local_id TEXT NOT NULL,
+      dia_semana TEXT NOT NULL,
+      sync_status TEXT NOT NULL DEFAULT 'pending_create'
+        CHECK (sync_status IN ('synced', 'pending_create', 'pending_update', 'pending_delete', 'conflict')),
+      UNIQUE(rutina_local_id, dia_semana)
+    );
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS registro_habitos (
+      local_id TEXT PRIMARY KEY NOT NULL,
+      remote_id INTEGER UNIQUE,
+      habito_local_id TEXT NOT NULL,
+      fecha TEXT NOT NULL,
+      completado INTEGER NOT NULL DEFAULT 0 CHECK (completado IN (0, 1)),
+      observacion TEXT,
+      created_at TEXT,
+      updated_at TEXT,
+      sync_status TEXT NOT NULL DEFAULT 'pending_create'
+        CHECK (sync_status IN ('synced', 'pending_create', 'pending_update', 'pending_delete', 'conflict')),
+      UNIQUE(habito_local_id, fecha)
+    );
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS actividad_habitos (
+      local_id TEXT PRIMARY KEY NOT NULL,
+      remote_id INTEGER UNIQUE,
+      habito_local_id TEXT NOT NULL,
+      nombre TEXT NOT NULL,
+      created_at TEXT,
+      updated_at TEXT,
       sync_status TEXT NOT NULL DEFAULT 'pending_create'
         CHECK (sync_status IN ('synced', 'pending_create', 'pending_update', 'pending_delete', 'conflict'))
     );
@@ -71,15 +117,26 @@ export const schemaStatements = [
       local_id TEXT PRIMARY KEY NOT NULL,
       remote_id INTEGER UNIQUE,
       user_remote_id INTEGER,
-      titulo TEXT NOT NULL,
-      motivo TEXT,
-      objetivo INTEGER,
+      nombre TEXT NOT NULL,
       fecha_inicio TEXT,
-      fecha_limite TEXT,
-      estado TEXT NOT NULL DEFAULT 'pendiente',
       created_at TEXT,
       updated_at TEXT,
-      deleted_at TEXT,
+      sync_status TEXT NOT NULL DEFAULT 'pending_create'
+        CHECK (sync_status IN ('synced', 'pending_create', 'pending_update', 'pending_delete', 'conflict'))
+    );
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS objetivos (
+      local_id TEXT PRIMARY KEY NOT NULL,
+      remote_id INTEGER UNIQUE,
+      user_remote_id INTEGER,
+      meta_local_id TEXT,
+      habito_local_id TEXT NOT NULL,
+      nombre TEXT NOT NULL,
+      meta_esperada INTEGER NOT NULL,
+      fecha_limite TEXT NOT NULL,
+      created_at TEXT,
+      updated_at TEXT,
       sync_status TEXT NOT NULL DEFAULT 'pending_create'
         CHECK (sync_status IN ('synced', 'pending_create', 'pending_update', 'pending_delete', 'conflict'))
     );
@@ -103,6 +160,11 @@ export const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status, created_at);`,
   `CREATE INDEX IF NOT EXISTS idx_habitos_sync_status ON habitos(sync_status);`,
   `CREATE INDEX IF NOT EXISTS idx_rutinas_sync_status ON rutinas(sync_status);`,
+  `CREATE INDEX IF NOT EXISTS idx_rutina_habitos_sync_status ON rutina_habitos(sync_status);`,
+  `CREATE INDEX IF NOT EXISTS idx_rutina_dias_sync_status ON rutina_dias(sync_status);`,
+  `CREATE INDEX IF NOT EXISTS idx_registro_habitos_sync_status ON registro_habitos(sync_status);`,
+  `CREATE INDEX IF NOT EXISTS idx_actividad_habitos_sync_status ON actividad_habitos(sync_status);`,
   `CREATE INDEX IF NOT EXISTS idx_tareas_sync_status ON tareas(sync_status);`,
   `CREATE INDEX IF NOT EXISTS idx_metas_sync_status ON metas(sync_status);`,
+  `CREATE INDEX IF NOT EXISTS idx_objetivos_sync_status ON objetivos(sync_status);`,
 ] as const;

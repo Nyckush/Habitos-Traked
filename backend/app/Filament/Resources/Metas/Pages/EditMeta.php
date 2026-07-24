@@ -10,11 +10,6 @@ class EditMeta extends EditRecord
 {
     protected static string $resource = MetaResource::class;
 
-    protected function afterSave(): void
-    {
-        $this->record->recalcularEstadoPorObjetivo();
-    }
-
     protected function getHeaderActions(): array
     {
         return [
