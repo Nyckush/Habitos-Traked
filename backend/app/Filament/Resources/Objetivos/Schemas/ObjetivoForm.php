@@ -31,13 +31,14 @@ class ObjetivoForm
                 TextInput::make('nombre')
                     ->required()
                     ->maxLength(255),
-                Select::make('habito_id')
-                    ->label('Habito')
+                Select::make('habitos')
+                    ->label('Habitos')
                     ->relationship(
-                        name: 'habito',
+                        name: 'habitos',
                         titleAttribute: 'nombre',
                         modifyQueryUsing: fn (Builder $query): Builder => $query->where('user_id', auth()->id()),
                     )
+                    ->multiple()
                     ->searchable()
                     ->preload()
                     ->required(),

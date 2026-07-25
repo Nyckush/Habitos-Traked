@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Objetivo extends Model
 {
@@ -16,7 +17,6 @@ class Objetivo extends Model
     protected $fillable = [
         'user_id',
         'meta_id',
-        'habito_id',
         'nombre',
         'meta_esperada',
         'fecha_limite',
@@ -52,9 +52,11 @@ class Objetivo extends Model
         return $this->belongsTo(Meta::class);
     }
 
-    public function habito(): BelongsTo
+    public function habitos(): BelongsToMany
     {
-        return $this->belongsTo(Habito::class);
+        return $this->belongsToMany(Habito::class, 'objetivo_habitos')
+            ->using(ObjetivoHabito::class)
+            ->withTimestamps();
     }
 
     public function getMetaActualAttribute(): int
@@ -88,12 +90,20 @@ class Objetivo extends Model
 
     public function calcularMetaActual(): int
     {
-        if (blank($this->habito_id) || blank($this->fecha_limite) || blank($this->created_at)) {
+        if (blank($this->fecha_limite) || blank($this->created_at)) {
+            return 0;
+        }
+
+        $habitoIds = $this->relationLoaded('habitos')
+            ? $this->habitos->pluck('id')->all()
+            : $this->habitos()->pluck('habitos.id')->all();
+
+        if ($habitoIds === []) {
             return 0;
         }
 
         return RegistroHabito::query()
-            ->where('habito_id', $this->habito_id)
+            ->whereIn('habito_id', $habitoIds)
             ->where('completado', true)
             ->whereBetween('fecha', [
                 $this->created_at->toDateString(),

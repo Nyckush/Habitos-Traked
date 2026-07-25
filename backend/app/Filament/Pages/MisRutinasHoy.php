@@ -277,7 +277,7 @@ class MisRutinasHoy extends Page
 
         $this->objetivos = Objetivo::query()
             ->where('user_id', auth()->id())
-            ->with('habito')
+            ->with('habitos')
             ->orderBy('fecha_limite')
             ->get();
 

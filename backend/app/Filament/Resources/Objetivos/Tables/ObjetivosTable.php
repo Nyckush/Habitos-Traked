@@ -19,9 +19,10 @@ class ObjetivosTable
                 TextColumn::make('meta.nombre')
                     ->label('Meta')
                     ->searchable(),
-                TextColumn::make('habito.nombre')
-                    ->label('Habito')
-                    ->searchable(),
+                TextColumn::make('habitos.nombre')
+                    ->label('Habitos')
+                    ->badge()
+                    ->separator(', '),
                 TextColumn::make('meta_esperada')
                     ->label('Meta esperada')
                     ->numeric(decimalPlaces: 0),

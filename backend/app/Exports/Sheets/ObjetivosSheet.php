@@ -33,7 +33,7 @@ class ObjetivosSheet implements FromArray, ShouldAutoSize, WithEvents, WithTitle
         ];
 
         $objetivos = $this->user->objetivos()
-            ->with(['meta', 'habito'])
+            ->with(['meta', 'habitos'])
             ->orderBy('fecha_limite')
             ->get();
 
@@ -41,7 +41,7 @@ class ObjetivosSheet implements FromArray, ShouldAutoSize, WithEvents, WithTitle
             $rows[] = [
                 $objetivo->meta?->nombre ?? 'Sin meta',
                 $objetivo->nombre,
-                $objetivo->habito?->nombre ?? 'Sin habito',
+                $objetivo->habitos->pluck('nombre')->join(', ') ?: 'Sin habitos',
                 $objetivo->meta?->fecha_inicio?->toDateString() ?? $objetivo->created_at?->toDateString() ?? '',
                 $objetivo->fecha_limite?->toDateString() ?? '',
                 (int) $objetivo->meta_esperada,

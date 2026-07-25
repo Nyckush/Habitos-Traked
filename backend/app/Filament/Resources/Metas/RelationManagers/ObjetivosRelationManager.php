@@ -30,8 +30,10 @@ class ObjetivosRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('nombre')
                     ->searchable(),
-                TextColumn::make('habito.nombre')
-                    ->label('Habito'),
+                TextColumn::make('habitos.nombre')
+                    ->label('Habitos')
+                    ->badge()
+                    ->separator(', '),
                 TextColumn::make('meta_esperada')
                     ->label('Meta esperada')
                     ->numeric(decimalPlaces: 0),
@@ -56,13 +58,14 @@ class ObjetivosRelationManager extends RelationManager
                         TextInput::make('nombre')
                             ->required()
                             ->maxLength(255),
-                        Select::make('habito_id')
-                            ->label('Habito')
+                        Select::make('habitos')
+                            ->label('Habitos')
                             ->relationship(
-                                name: 'habito',
+                                name: 'habitos',
                                 titleAttribute: 'nombre',
                                 modifyQueryUsing: fn (Builder $query): Builder => $query->where('user_id', auth()->id()),
                             )
+                            ->multiple()
                             ->searchable()
                             ->preload()
                             ->required(),

@@ -11,17 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('objetivos', function (Blueprint $table) {
+        Schema::create('tareas', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('meta_id')->nullable()->constrained('metas')->nullOnDelete();
-            $table->string('nombre');
-            $table->unsignedInteger('meta_esperada');
-            $table->date('fecha_limite');
+            $table->string('titulo');
+            $table->time('hora_inicio')->nullable();
+            $table->string('estado')->default('pendiente');
+            $table->timestamp('completed_at')->nullable();
             $table->timestamps();
+            $table->softDeletes();
 
-            $table->index(['meta_id', 'fecha_limite']);
-            $table->index(['user_id', 'fecha_limite']);
+            $table->index(['user_id', 'estado']);
+            $table->index(['user_id', 'hora_inicio']);
         });
     }
 
@@ -30,6 +31,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('objetivos');
+        Schema::dropIfExists('tareas');
     }
 };

@@ -230,7 +230,7 @@
                             <span>{{ $objetivo->meta_actual }} / {{ $objetivo->meta_esperada }}</span>
                         </div>
                         <div class="mrh-meta-stats">
-                            <span>{{ $objetivo->habito?->nombre ?? 'Sin habito' }}</span>
+                            <span>{{ $objetivo->habitos->pluck('nombre')->join(', ') ?: 'Sin habitos' }}</span>
                             <span>Hasta {{ $objetivo->fecha_limite?->translatedFormat('d M Y') }}</span>
                         </div>
                     </div>

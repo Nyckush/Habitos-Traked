@@ -14,14 +14,17 @@ class AuthController extends Controller
     public function register(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'nombre' => ['required', 'string', 'max:255'],
+            'username' => ['nullable', 'string', 'max:255'],
+            'nombre' => ['nullable', 'string', 'max:255'],
+            'perfil' => ['nullable', 'string'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'device_name' => ['nullable', 'string', 'max:255'],
         ]);
 
         $user = User::create([
-            'nombre' => $data['nombre'],
+            'username' => $data['username'] ?? $data['nombre'] ?? null,
+            'perfil' => $data['perfil'] ?? null,
             'email' => $data['email'],
             'password' => $data['password'],
         ]);
@@ -79,13 +82,14 @@ class AuthController extends Controller
     }
 
     /**
-     * @return array{id:int,nombre:string,email:string,created_at:?string,updated_at:?string}
+     * @return array{id:int,username:string,perfil:?string,email:string,created_at:?string,updated_at:?string}
      */
     private function userPayload(User $user): array
     {
         return [
             'id' => $user->id,
-            'nombre' => $user->nombre,
+            'username' => $user->username,
+            'perfil' => $user->perfil,
             'email' => $user->email,
             'created_at' => $user->created_at?->toISOString(),
             'updated_at' => $user->updated_at?->toISOString(),

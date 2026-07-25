@@ -5,23 +5,23 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
-class RutinaHabito extends Pivot
+class ObjetivoHabito extends Pivot
 {
-    public $timestamps = false;
+    protected $table = 'objetivo_habitos';
+
     public $incrementing = true;
 
     /**
      * @var list<string>
      */
     protected $fillable = [
-        'rutina_id',
+        'objetivo_id',
         'habito_id',
-        'hora_inicio',
     ];
 
-    public function rutina(): BelongsTo
+    public function objetivo(): BelongsTo
     {
-        return $this->belongsTo(Rutina::class);
+        return $this->belongsTo(Objetivo::class);
     }
 
     public function habito(): BelongsTo

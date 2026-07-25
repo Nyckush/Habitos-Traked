@@ -44,8 +44,10 @@ class Habito extends Model
         return $this->hasMany(ActividadHabito::class);
     }
 
-    public function objetivos(): HasMany
+    public function objetivos(): BelongsToMany
     {
-        return $this->hasMany(Objetivo::class);
+        return $this->belongsToMany(Objetivo::class, 'objetivo_habitos')
+            ->using(ObjetivoHabito::class)
+            ->withTimestamps();
     }
 }

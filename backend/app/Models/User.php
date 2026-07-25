@@ -25,6 +25,8 @@ class User extends Authenticatable implements FilamentUser
     protected $fillable = [
         'name',
         'nombre',
+        'username',
+        'perfil',
         'email',
         'password',
     ];
@@ -54,12 +56,16 @@ class User extends Authenticatable implements FilamentUser
     protected static function booted(): void
     {
         static::creating(function (self $user): void {
-            if (blank($user->nombre) && filled($user->name)) {
-                $user->nombre = $user->name;
+            if (blank($user->username) && filled($user->nombre)) {
+                $user->username = $user->nombre;
             }
 
-            if (blank($user->nombre)) {
-                $user->nombre = (string) str($user->email)->before('@');
+            if (blank($user->username) && filled($user->name)) {
+                $user->username = $user->name;
+            }
+
+            if (blank($user->username)) {
+                $user->username = (string) str($user->email)->before('@');
             }
         });
     }
@@ -67,8 +73,16 @@ class User extends Authenticatable implements FilamentUser
     protected function name(): Attribute
     {
         return Attribute::make(
-            get: fn (): ?string => $this->attributes['nombre'] ?? null,
-            set: fn (?string $value): array => ['nombre' => $value],
+            get: fn (): ?string => $this->attributes['username'] ?? null,
+            set: fn (?string $value): array => ['username' => $value],
+        );
+    }
+
+    protected function nombre(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): ?string => $this->attributes['username'] ?? null,
+            set: fn (?string $value): array => ['username' => $value],
         );
     }
 
@@ -85,6 +99,11 @@ class User extends Authenticatable implements FilamentUser
     public function objetivos(): HasMany
     {
         return $this->hasMany(Objetivo::class);
+    }
+
+    public function tareas(): HasMany
+    {
+        return $this->hasMany(Tarea::class);
     }
 
     public function metas(): HasMany

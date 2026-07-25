@@ -22,9 +22,9 @@ class ObjetivosPrototypeSheet implements FromArray, ShouldAutoSize, WithEvents, 
             ['Planilla de Objetivos', '', '', '', '', '', '', '', '', ''],
             ['Generada el 2026-07-22', '', '', '', '', '', '', '', '', ''],
             ['Meta', 'Objetivo', 'Habito asociado', 'Fecha inicio', 'Fecha limite', 'Meta esperada', 'Meta actual', 'Dias cumplidos', 'Tasa de exito', 'Estado'],
-            ['Ponerme en forma para el verano', 'Correr 4 veces a la semana', 'Correr', '2026-07-22', '2026-07-26', 4, 3, 3, 75.0, 'Completado Parcialmente'],
+            ['Ponerme en forma para el verano', 'Correr 4 veces a la semana', 'Correr, Dormir temprano', '2026-07-22', '2026-07-26', 4, 3, 3, 75.0, 'Completado Parcialmente'],
             ['Ponerme en forma para el verano', 'Tomar agua 7 dias seguidos', 'Tomar agua', '2026-07-22', '2026-07-28', 7, 5, 5, 71.43, 'Completado Parcialmente'],
-            ['Mejorar mi disciplina', 'Leer 5 veces', 'Leer', '2026-07-22', '2026-07-26', 5, 0, 0, 0.0, 'Vencido'],
+            ['Mejorar mi disciplina', 'Leer 5 veces', 'Leer, Escribir resumen', '2026-07-22', '2026-07-26', 5, 0, 0, 0.0, 'Vencido'],
         ];
     }
 
