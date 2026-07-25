@@ -13,9 +13,11 @@ import {
 } from '@/database';
 import { useAuth } from '@/providers/auth-provider';
 import { useDatabase } from '@/providers/database-provider';
+import { syncScheduledNotificationsAsync } from '@/services/notifications';
+import { syncRoutines } from '@/services/routines-sync';
 
 export default function RoutinesCreateScreen() {
-  const { user } = useAuth();
+  const { token, user } = useAuth();
   const { refreshStatus } = useDatabase();
   const inputRef = useRef<TextInput>(null);
   const [nombre, setNombre] = useState('');
@@ -89,6 +91,11 @@ export default function RoutinesCreateScreen() {
         ),
       );
 
+      if (token && user) {
+        await syncRoutines(token, user.id);
+      }
+
+      await syncScheduledNotificationsAsync();
       setNombre('');
       setSelectedDays([]);
       await refreshStatus();

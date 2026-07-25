@@ -1,4 +1,8 @@
+import type { RemoteRoutineHabitLink } from '@/services';
+
 import { getDatabase } from '../client';
+import { getHabitByRemoteId } from './habits-repository';
+import { getRoutineByRemoteId } from './routines-repository';
 
 export type RoutineHabitLink = {
   local_id: string;
@@ -129,6 +133,36 @@ export async function updateRoutineHabitLink(
 
 export async function deleteRoutineHabitLink(localId: string): Promise<void> {
   const db = await getDatabase();
+  const existingLinks = await listRoutineHabitLinks();
+  const currentLink = existingLinks.find((link) => link.local_id === localId);
+
+  if (!currentLink) {
+    return;
+  }
+
+  if (currentLink.remote_id === null) {
+    await db.runAsync(
+      `
+        DELETE FROM rutina_habitos
+        WHERE local_id = ?;
+      `,
+      [localId],
+    );
+    return;
+  }
+
+  await db.runAsync(
+    `
+      UPDATE rutina_habitos
+      SET sync_status = ?
+      WHERE local_id = ?;
+    `,
+    ['pending_delete', localId],
+  );
+}
+
+export async function hardDeleteRoutineHabitLink(localId: string): Promise<void> {
+  const db = await getDatabase();
 
   await db.runAsync(
     `
@@ -137,4 +171,98 @@ export async function deleteRoutineHabitLink(localId: string): Promise<void> {
     `,
     [localId],
   );
+}
+
+export async function getRoutineHabitLinkByRemoteId(
+  remoteId: number,
+): Promise<RoutineHabitLink | null> {
+  const links = await listRoutineHabitLinks();
+
+  return links.find((link) => link.remote_id === remoteId) ?? null;
+}
+
+export async function markRoutineHabitLinkAsSynced(
+  localId: string,
+  remoteLink: RemoteRoutineHabitLink,
+  routineLocalId: string,
+  habitLocalId: string,
+): Promise<void> {
+  const db = await getDatabase();
+
+  await db.runAsync(
+    `
+      UPDATE rutina_habitos
+      SET remote_id = ?, rutina_local_id = ?, habito_local_id = ?, hora_inicio = ?, sync_status = ?
+      WHERE local_id = ?;
+    `,
+    [
+      remoteLink.id,
+      routineLocalId,
+      habitLocalId,
+      remoteLink.hora_inicio,
+      'synced',
+      localId,
+    ],
+  );
+}
+
+export async function upsertRoutineHabitLinkFromRemote(
+  remoteLink: RemoteRoutineHabitLink,
+): Promise<RoutineHabitLink | null> {
+  const [existingLink, routine, habit] = await Promise.all([
+    getRoutineHabitLinkByRemoteId(remoteLink.id),
+    getRoutineByRemoteId(remoteLink.rutina_id),
+    getHabitByRemoteId(remoteLink.habito_id),
+  ]);
+
+  if (!routine || !habit) {
+    return null;
+  }
+
+  if (existingLink) {
+    await markRoutineHabitLinkAsSynced(
+      existingLink.local_id,
+      remoteLink,
+      routine.local_id,
+      habit.local_id,
+    );
+
+    return {
+      ...existingLink,
+      remote_id: remoteLink.id,
+      rutina_local_id: routine.local_id,
+      habito_local_id: habit.local_id,
+      hora_inicio: remoteLink.hora_inicio,
+      sync_status: 'synced',
+    };
+  }
+
+  const db = await getDatabase();
+  const localId = `remote-routine-habit-${remoteLink.id}`;
+
+  await db.runAsync(
+    `
+      INSERT INTO rutina_habitos (
+        local_id, remote_id, rutina_local_id, habito_local_id, hora_inicio, sync_status
+      )
+      VALUES (?, ?, ?, ?, ?, ?);
+    `,
+    [
+      localId,
+      remoteLink.id,
+      routine.local_id,
+      habit.local_id,
+      remoteLink.hora_inicio,
+      'synced',
+    ],
+  );
+
+  return {
+    local_id: localId,
+    remote_id: remoteLink.id,
+    rutina_local_id: routine.local_id,
+    habito_local_id: habit.local_id,
+    hora_inicio: remoteLink.hora_inicio,
+    sync_status: 'synced',
+  };
 }

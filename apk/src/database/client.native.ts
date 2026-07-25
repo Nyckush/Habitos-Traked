@@ -258,11 +258,361 @@ async function migrateToVersion8(db: SQLiteDatabase) {
   await db.execAsync('CREATE INDEX IF NOT EXISTS idx_objetivos_sync_status ON objetivos(sync_status);');
 }
 
+async function migrateToVersion9(db: SQLiteDatabase) {
+  if (!(await tableExists(db, 'tareas'))) {
+    return;
+  }
+
+  const taskColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(tareas);');
+  const hasDescripcionColumn = taskColumns.some((column) => column.name === 'descripcion');
+  const hasFechaLimiteColumn = taskColumns.some((column) => column.name === 'fecha_limite');
+
+  if (!hasDescripcionColumn && !hasFechaLimiteColumn) {
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tareas_sync_status ON tareas(sync_status);');
+    return;
+  }
+
+  if (await tableExists(db, 'tareas_new')) {
+    await db.execAsync('DROP TABLE tareas_new;');
+  }
+
+  await db.execAsync(`
+    CREATE TABLE tareas_new (
+      local_id TEXT PRIMARY KEY NOT NULL,
+      remote_id INTEGER UNIQUE,
+      user_remote_id INTEGER,
+      titulo TEXT NOT NULL,
+      estado TEXT NOT NULL DEFAULT 'pendiente',
+      created_at TEXT,
+      updated_at TEXT,
+      deleted_at TEXT,
+      sync_status TEXT NOT NULL DEFAULT 'pending_create'
+        CHECK (sync_status IN ('synced', 'pending_create', 'pending_update', 'pending_delete', 'conflict'))
+    );
+  `);
+
+  await db.execAsync(`
+    INSERT INTO tareas_new (
+      local_id, remote_id, user_remote_id, titulo, estado, created_at, updated_at, deleted_at, sync_status
+    )
+    SELECT
+      local_id,
+      remote_id,
+      user_remote_id,
+      titulo,
+      estado,
+      created_at,
+      updated_at,
+      deleted_at,
+      sync_status
+    FROM tareas;
+  `);
+
+  await db.execAsync('DROP TABLE tareas;');
+  await db.execAsync('ALTER TABLE tareas_new RENAME TO tareas;');
+  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tareas_sync_status ON tareas(sync_status);');
+}
+
+async function migrateToVersion10(db: SQLiteDatabase) {
+  if (!(await tableExists(db, 'tareas'))) {
+    return;
+  }
+
+  const taskColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(tareas);');
+  const hasCompletedAtColumn = taskColumns.some((column) => column.name === 'completed_at');
+
+  if (hasCompletedAtColumn) {
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tareas_sync_status ON tareas(sync_status);');
+    return;
+  }
+
+  if (await tableExists(db, 'tareas_new')) {
+    await db.execAsync('DROP TABLE tareas_new;');
+  }
+
+  await db.execAsync(`
+    CREATE TABLE tareas_new (
+      local_id TEXT PRIMARY KEY NOT NULL,
+      remote_id INTEGER UNIQUE,
+      user_remote_id INTEGER,
+      titulo TEXT NOT NULL,
+      estado TEXT NOT NULL DEFAULT 'pendiente',
+      completed_at TEXT,
+      created_at TEXT,
+      updated_at TEXT,
+      deleted_at TEXT,
+      sync_status TEXT NOT NULL DEFAULT 'pending_create'
+        CHECK (sync_status IN ('synced', 'pending_create', 'pending_update', 'pending_delete', 'conflict'))
+    );
+  `);
+
+  await db.execAsync(`
+    INSERT INTO tareas_new (
+      local_id, remote_id, user_remote_id, titulo, estado, completed_at, created_at, updated_at, deleted_at, sync_status
+    )
+    SELECT
+      local_id,
+      remote_id,
+      user_remote_id,
+      titulo,
+      estado,
+      NULL,
+      created_at,
+      updated_at,
+      deleted_at,
+      sync_status
+    FROM tareas;
+  `);
+
+  await db.execAsync('DROP TABLE tareas;');
+  await db.execAsync('ALTER TABLE tareas_new RENAME TO tareas;');
+  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tareas_sync_status ON tareas(sync_status);');
+}
+
+async function migrateToVersion11(db: SQLiteDatabase) {
+  if (!(await tableExists(db, 'tareas'))) {
+    return;
+  }
+
+  const taskColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(tareas);');
+  const hasHoraInicioColumn = taskColumns.some((column) => column.name === 'hora_inicio');
+
+  if (hasHoraInicioColumn) {
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tareas_sync_status ON tareas(sync_status);');
+    return;
+  }
+
+  if (await tableExists(db, 'tareas_new')) {
+    await db.execAsync('DROP TABLE tareas_new;');
+  }
+
+  await db.execAsync(`
+    CREATE TABLE tareas_new (
+      local_id TEXT PRIMARY KEY NOT NULL,
+      remote_id INTEGER UNIQUE,
+      user_remote_id INTEGER,
+      titulo TEXT NOT NULL,
+      hora_inicio TEXT,
+      estado TEXT NOT NULL DEFAULT 'pendiente',
+      completed_at TEXT,
+      created_at TEXT,
+      updated_at TEXT,
+      deleted_at TEXT,
+      sync_status TEXT NOT NULL DEFAULT 'pending_create'
+        CHECK (sync_status IN ('synced', 'pending_create', 'pending_update', 'pending_delete', 'conflict'))
+    );
+  `);
+
+  await db.execAsync(`
+    INSERT INTO tareas_new (
+      local_id, remote_id, user_remote_id, titulo, hora_inicio, estado, completed_at, created_at, updated_at, deleted_at, sync_status
+    )
+    SELECT
+      local_id,
+      remote_id,
+      user_remote_id,
+      titulo,
+      NULL,
+      estado,
+      completed_at,
+      created_at,
+      updated_at,
+      deleted_at,
+      sync_status
+    FROM tareas;
+  `);
+
+  await db.execAsync('DROP TABLE tareas;');
+  await db.execAsync('ALTER TABLE tareas_new RENAME TO tareas;');
+  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tareas_sync_status ON tareas(sync_status);');
+}
+
+async function migrateToVersion12(db: SQLiteDatabase) {
+  const objetivosExists = await tableExists(db, 'objetivos');
+  const objetivoHabitosExists = await tableExists(db, 'objetivo_habitos');
+
+  if (!objetivoHabitosExists) {
+    await db.execAsync(`
+      CREATE TABLE objetivo_habitos (
+        local_id TEXT PRIMARY KEY NOT NULL,
+        remote_id INTEGER UNIQUE,
+        objetivo_local_id TEXT NOT NULL,
+        habito_local_id TEXT NOT NULL,
+        created_at TEXT,
+        updated_at TEXT,
+        sync_status TEXT NOT NULL DEFAULT 'pending_create'
+          CHECK (sync_status IN ('synced', 'pending_create', 'pending_update', 'pending_delete', 'conflict')),
+        UNIQUE(objetivo_local_id, habito_local_id)
+      );
+    `);
+  }
+
+  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_objetivo_habitos_sync_status ON objetivo_habitos(sync_status);');
+
+  if (!objetivosExists) {
+    await db.execAsync(`
+      CREATE TABLE objetivos (
+        local_id TEXT PRIMARY KEY NOT NULL,
+        remote_id INTEGER UNIQUE,
+        user_remote_id INTEGER,
+        meta_local_id TEXT,
+        nombre TEXT NOT NULL,
+        meta_esperada INTEGER NOT NULL,
+        fecha_limite TEXT NOT NULL,
+        created_at TEXT,
+        updated_at TEXT,
+        sync_status TEXT NOT NULL DEFAULT 'pending_create'
+          CHECK (sync_status IN ('synced', 'pending_create', 'pending_update', 'pending_delete', 'conflict'))
+      );
+    `);
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_objetivos_sync_status ON objetivos(sync_status);');
+    return;
+  }
+
+  const objetivoColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(objetivos);');
+  const hasHabitoLocalIdColumn = objetivoColumns.some((column) => column.name === 'habito_local_id');
+
+  if (!hasHabitoLocalIdColumn) {
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_objetivos_sync_status ON objetivos(sync_status);');
+    return;
+  }
+
+  await db.execAsync(`
+    INSERT OR IGNORE INTO objetivo_habitos (
+      local_id, remote_id, objetivo_local_id, habito_local_id, created_at, updated_at, sync_status
+    )
+    SELECT
+      'objetivo-habito-' || objetivos.local_id || '-' || objetivos.habito_local_id,
+      NULL,
+      objetivos.local_id,
+      objetivos.habito_local_id,
+      objetivos.created_at,
+      objetivos.updated_at,
+      CASE
+        WHEN objetivos.sync_status = 'synced' THEN 'synced'
+        ELSE 'pending_create'
+      END
+    FROM objetivos
+    WHERE objetivos.habito_local_id IS NOT NULL;
+  `);
+
+  if (await tableExists(db, 'objetivos_new')) {
+    await db.execAsync('DROP TABLE objetivos_new;');
+  }
+
+  await db.execAsync(`
+    CREATE TABLE objetivos_new (
+      local_id TEXT PRIMARY KEY NOT NULL,
+      remote_id INTEGER UNIQUE,
+      user_remote_id INTEGER,
+      meta_local_id TEXT,
+      nombre TEXT NOT NULL,
+      meta_esperada INTEGER NOT NULL,
+      fecha_limite TEXT NOT NULL,
+      created_at TEXT,
+      updated_at TEXT,
+      sync_status TEXT NOT NULL DEFAULT 'pending_create'
+        CHECK (sync_status IN ('synced', 'pending_create', 'pending_update', 'pending_delete', 'conflict'))
+    );
+  `);
+
+  await db.execAsync(`
+    INSERT INTO objetivos_new (
+      local_id, remote_id, user_remote_id, meta_local_id, nombre, meta_esperada, fecha_limite, created_at, updated_at, sync_status
+    )
+    SELECT
+      local_id,
+      remote_id,
+      user_remote_id,
+      meta_local_id,
+      nombre,
+      meta_esperada,
+      fecha_limite,
+      created_at,
+      updated_at,
+      sync_status
+    FROM objetivos;
+  `);
+
+  await db.execAsync('DROP TABLE objetivos;');
+  await db.execAsync('ALTER TABLE objetivos_new RENAME TO objetivos;');
+  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_objetivos_sync_status ON objetivos(sync_status);');
+}
+
+async function migrateToVersion13(db: SQLiteDatabase) {
+  if (!(await tableExists(db, 'users'))) {
+    return;
+  }
+
+  const userColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(users);');
+  const hasUsernameColumn = userColumns.some((column) => column.name === 'username');
+  const hasPerfilColumn = userColumns.some((column) => column.name === 'perfil');
+  const hasNombreColumn = userColumns.some((column) => column.name === 'nombre');
+
+  if (hasUsernameColumn && hasPerfilColumn) {
+    return;
+  }
+
+  if (await tableExists(db, 'users_new')) {
+    await db.execAsync('DROP TABLE users_new;');
+  }
+
+  await db.execAsync(`
+    CREATE TABLE users_new (
+      local_id TEXT PRIMARY KEY NOT NULL,
+      remote_id INTEGER UNIQUE,
+      username TEXT NOT NULL,
+      perfil TEXT,
+      email TEXT NOT NULL,
+      created_at TEXT,
+      updated_at TEXT,
+      sync_status TEXT NOT NULL DEFAULT 'synced'
+        CHECK (sync_status IN ('synced', 'pending_create', 'pending_update', 'pending_delete', 'conflict'))
+    );
+  `);
+
+  await db.execAsync(`
+    INSERT INTO users_new (
+      local_id, remote_id, username, perfil, email, created_at, updated_at, sync_status
+    )
+    SELECT
+      local_id,
+      remote_id,
+      ${hasUsernameColumn ? 'username' : hasNombreColumn ? 'nombre' : "''"},
+      ${hasPerfilColumn ? 'perfil' : 'NULL'},
+      email,
+      created_at,
+      updated_at,
+      sync_status
+    FROM users;
+  `);
+
+  await db.execAsync('DROP TABLE users;');
+  await db.execAsync('ALTER TABLE users_new RENAME TO users;');
+}
+
+async function ensureUsersSchema(db: SQLiteDatabase) {
+  if (!(await tableExists(db, 'users'))) {
+    return;
+  }
+
+  const userColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(users);');
+  const hasUsernameColumn = userColumns.some((column) => column.name === 'username');
+  const hasPerfilColumn = userColumns.some((column) => column.name === 'perfil');
+
+  if (hasUsernameColumn && hasPerfilColumn) {
+    return;
+  }
+
+  await migrateToVersion13(db);
+}
+
 async function runMigrations(db: SQLiteDatabase) {
   const result = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version;');
   const currentVersion = result?.user_version ?? 0;
 
   if (currentVersion >= DATABASE_VERSION) {
+    await ensureUsersSchema(db);
     return;
   }
 
@@ -301,8 +651,30 @@ async function runMigrations(db: SQLiteDatabase) {
       await migrateToVersion8(db);
     }
 
+    if (currentVersion <= 8 && DATABASE_VERSION >= 9) {
+      await migrateToVersion9(db);
+    }
+
+    if (currentVersion <= 9 && DATABASE_VERSION >= 10) {
+      await migrateToVersion10(db);
+    }
+
+    if (currentVersion <= 10 && DATABASE_VERSION >= 11) {
+      await migrateToVersion11(db);
+    }
+
+    if (currentVersion <= 11 && DATABASE_VERSION >= 12) {
+      await migrateToVersion12(db);
+    }
+
+    if (currentVersion <= 12 && DATABASE_VERSION >= 13) {
+      await migrateToVersion13(db);
+    }
+
     await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION};`);
   });
+
+  await ensureUsersSchema(db);
 }
 
 export async function getDatabase(): Promise<AppDatabase> {
@@ -335,4 +707,22 @@ export async function getDatabaseStatus() {
     routinesCount: routinesRow?.count ?? 0,
     queueCount: queueRow?.count ?? 0,
   };
+}
+
+export async function clearLocalDomainData(): Promise<void> {
+  const db = await getDatabase();
+
+  await db.withTransactionAsync(async () => {
+    await db.execAsync('DELETE FROM objetivo_habitos;');
+    await db.execAsync('DELETE FROM objetivos;');
+    await db.execAsync('DELETE FROM metas;');
+    await db.execAsync('DELETE FROM registro_habitos;');
+    await db.execAsync('DELETE FROM actividad_habitos;');
+    await db.execAsync('DELETE FROM rutina_habitos;');
+    await db.execAsync('DELETE FROM rutina_dias;');
+    await db.execAsync('DELETE FROM habitos;');
+    await db.execAsync('DELETE FROM rutinas;');
+    await db.execAsync('DELETE FROM tareas;');
+    await db.execAsync('DELETE FROM sync_queue;');
+  });
 }

@@ -1,29 +1,40 @@
-import { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
+  completeTask,
   listHabitRecords,
   listHabits,
+  listRoutines,
   listRoutineDays,
   listRoutineHabitLinks,
+  listPendingTasks,
   saveHabitRecord,
   type Habit,
   type HabitRecord,
+  type Routine,
   type RoutineDay,
   type RoutineHabitLink,
+  type Task,
 } from '@/database';
+import { useAuth } from '@/providers/auth-provider';
 import { useDatabase } from '@/providers/database-provider';
+import { pullHabitRecords, syncHabitRecords } from '@/services/habit-records-sync';
+import { syncScheduledNotificationsAsync } from '@/services/notifications';
+import { pullTasks, syncTasks } from '@/services/tasks-sync';
 
 type HomeHabitRow = {
   id: string;
+  tipo: 'habito' | 'tarea';
   habitoLocalId: string;
+  tareaLocalId: string | null;
   hora: string;
   nombre: string;
-  estado: 'Completado' | 'Pendiente' | 'Sin marcar';
+  estado: 'Completado' | 'Pendiente' | 'Sin marcar' | 'Completar';
 };
 
 const DAY_NAMES = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'] as const;
@@ -48,57 +59,106 @@ function resolveHabitStatus(habitLocalId: string, records: HabitRecord[], today:
   return todayRecord.completado ? 'Completado' : 'Pendiente';
 }
 
+function buildTaskRows(tasks: Task[]): HomeHabitRow[] {
+  return tasks.map((task) => ({
+    id: task.local_id,
+    tipo: 'tarea',
+    habitoLocalId: '',
+    tareaLocalId: task.local_id,
+    hora: task.hora_inicio ?? '--:--',
+    nombre: task.titulo,
+    estado: 'Completar',
+  }));
+}
+
 function buildRows(
   habits: Habit[],
+  routines: Routine[],
   routineDays: RoutineDay[],
   routineHabitLinks: RoutineHabitLink[],
   records: HabitRecord[],
+  tasks: Task[],
 ): HomeHabitRow[] {
   const today = todayDateString();
+  const activeExistingRoutineIds = new Set(routines.map((routine) => routine.local_id));
   const activeRoutineIds = new Set(
-    routineDays.filter((day) => day.dia_semana === todayDayName()).map((day) => day.rutina_local_id),
+    routineDays
+      .filter(
+        (day) =>
+          day.dia_semana === todayDayName() &&
+          activeExistingRoutineIds.has(day.rutina_local_id),
+      )
+      .map((day) => day.rutina_local_id),
   );
 
-  return routineHabitLinks
+  const habitRows = routineHabitLinks
     .filter((link) => activeRoutineIds.has(link.rutina_local_id))
     .map((link) => {
       const habit = habits.find((item) => item.local_id === link.habito_local_id);
 
       return {
         id: link.local_id,
+        tipo: 'habito',
         habitoLocalId: link.habito_local_id,
+        tareaLocalId: null,
         hora: link.hora_inicio ?? '--:--',
         nombre: habit?.nombre ?? 'Habito',
         estado: resolveHabitStatus(link.habito_local_id, records, today),
       };
-    })
-    .sort((left, right) => left.hora.localeCompare(right.hora));
+    });
+
+  return [...habitRows, ...buildTaskRows(tasks)].sort((left, right) => {
+    if (left.hora === right.hora) {
+      return left.nombre.localeCompare(right.nombre);
+    }
+
+    if (left.hora === '--:--') {
+      return 1;
+    }
+
+    if (right.hora === '--:--') {
+      return -1;
+    }
+
+    return left.hora.localeCompare(right.hora);
+  });
 }
 
 export default function HomeScreen() {
   const { isReady } = useDatabase();
+  const { token, user } = useAuth();
   const [rows, setRows] = useState<HomeHabitRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [savingRowId, setSavingRowId] = useState<string | null>(null);
+  const [taskButtonScale] = useState(() => new Animated.Value(1));
 
   const loadData = useCallback(async () => {
     try {
       setError(null);
 
-      const [habits, routineDays, routineHabitLinks, records] = await Promise.all([
+      if (token) {
+        await pullHabitRecords(token);
+        if (user) {
+          await pullTasks(token, user.id);
+        }
+      }
+
+      const [habits, routines, routineDays, routineHabitLinks, records, tasks] = await Promise.all([
         listHabits(),
+        listRoutines(),
         listRoutineDays(),
         listRoutineHabitLinks(),
         listHabitRecords(),
+        listPendingTasks(),
       ]);
 
-      setRows(buildRows(habits, routineDays, routineHabitLinks, records));
+      setRows(buildRows(habits, routines, routineDays, routineHabitLinks, records, tasks));
     } catch (loadError) {
       setError(
         loadError instanceof Error ? loadError.message : 'No se pudo cargar el registro de habitos.',
       );
     }
-  }, []);
+  }, [token, user]);
 
   const handleToggleCompleted = useCallback(
     async (row: HomeHabitRow) => {
@@ -106,11 +166,25 @@ export default function HomeScreen() {
         setError(null);
         setSavingRowId(row.id);
 
-        await saveHabitRecord({
-          habitoLocalId: row.habitoLocalId,
-          fecha: todayDateString(),
-          completado: row.estado !== 'Completado',
-        });
+        if (row.tipo === 'tarea' && row.tareaLocalId) {
+          await completeTask(row.tareaLocalId);
+
+          if (token && user) {
+            await syncTasks(token, user.id);
+          }
+
+          await syncScheduledNotificationsAsync();
+        } else {
+          await saveHabitRecord({
+            habitoLocalId: row.habitoLocalId,
+            fecha: todayDateString(),
+            completado: row.estado !== 'Completado',
+          });
+
+          if (token) {
+            await syncHabitRecords(token);
+          }
+        }
 
         await loadData();
       } catch (saveError) {
@@ -121,7 +195,7 @@ export default function HomeScreen() {
         setSavingRowId(null);
       }
     },
-    [loadData],
+    [loadData, token, user],
   );
 
   useFocusEffect(
@@ -138,6 +212,45 @@ export default function HomeScreen() {
     }, [isReady, loadData]),
   );
 
+  useEffect(() => {
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(taskButtonScale, {
+          toValue: 1.012,
+          duration: 420,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(taskButtonScale, {
+          toValue: 1,
+          duration: 420,
+          easing: Easing.in(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.delay(1100),
+        Animated.timing(taskButtonScale, {
+          toValue: 1.008,
+          duration: 360,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(taskButtonScale, {
+          toValue: 1,
+          duration: 360,
+          easing: Easing.in(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.delay(1200),
+      ]),
+    );
+
+    pulseLoop.start();
+
+    return () => {
+      pulseLoop.stop();
+    };
+  }, [taskButtonScale]);
+
   return (
     <ScrollView contentContainerStyle={styles.scrollContent}>
       <ThemedView style={styles.container}>
@@ -150,9 +263,25 @@ export default function HomeScreen() {
             <ThemedText style={styles.title}>Inicio</ThemedText>
           </View>
 
-          <ThemedText themeColor="textSecondary" style={styles.subtitle}>
-            Rutinas de hoy
-          </ThemedText>
+          <View style={styles.subtitleRow}>
+            <ThemedText themeColor="textSecondary" style={styles.subtitle}>
+              Rutinas de hoy
+            </ThemedText>
+
+            <View style={styles.createTaskButtonWrap}>
+              <Animated.View
+                style={{
+                  transform: [{ scale: taskButtonScale }],
+                }}>
+                <Pressable
+                  onPress={() => router.push('/tasks/create')}
+                  style={({ pressed }) => [styles.createTaskButton, pressed && styles.statusButtonDisabled]}>
+                  <MaterialDesignIcons name="plus-circle-outline" size={18} color="#FFFFFF" />
+                  <ThemedText style={styles.createTaskButtonText}>Crear tarea</ThemedText>
+                </Pressable>
+              </Animated.View>
+            </View>
+          </View>
 
           <View style={styles.tableHeader}>
             <ThemedText themeColor="textSecondary" style={[styles.headerCell, styles.timeCell]}>
@@ -186,6 +315,8 @@ export default function HomeScreen() {
                     styles.statusButton,
                     row.estado === 'Completado'
                       ? styles.statusButtonDone
+                      : row.estado === 'Completar'
+                        ? styles.statusButtonTask
                       : row.estado === 'Pendiente'
                         ? styles.statusButtonPending
                         : styles.statusButtonUnmarked,
@@ -196,6 +327,8 @@ export default function HomeScreen() {
                       styles.statusButtonText,
                       row.estado === 'Completado'
                         ? styles.statusDone
+                        : row.estado === 'Completar'
+                          ? styles.statusTask
                         : row.estado === 'Pendiente'
                           ? styles.statusPending
                           : styles.statusUnmarked,
@@ -246,15 +379,40 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     textAlign: 'left',
-    marginTop: 24,
+  },
+  subtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 36,
   },
   errorText: {
     color: '#DC2626',
   },
+  createTaskButtonWrap: {
+    borderRadius: 999,
+  },
+  createTaskButton: {
+    minHeight: 42,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    backgroundColor: '#1E1E24',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  createTaskButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
   tableHeader: {
     flexDirection: 'row',
     paddingHorizontal: 12,
-    marginTop: 18,
+    marginTop: 28,
   },
   headerCell: {
     fontSize: 13,
@@ -305,6 +463,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(245, 158, 11, 0.14)',
     borderColor: 'rgba(245, 158, 11, 0.28)',
   },
+  statusButtonTask: {
+    backgroundColor: 'rgba(59, 130, 246, 0.14)',
+    borderColor: 'rgba(59, 130, 246, 0.28)',
+  },
   statusButtonUnmarked: {
     backgroundColor: 'rgba(63, 63, 70, 0.4)',
     borderColor: '#3F3F46',
@@ -322,6 +484,9 @@ const styles = StyleSheet.create({
   },
   statusPending: {
     color: '#F59E0B',
+  },
+  statusTask: {
+    color: '#60A5FA',
   },
   statusUnmarked: {
     color: '#A1A1AA',

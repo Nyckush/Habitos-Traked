@@ -7,16 +7,23 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset } from '@/constants/theme';
 import { listHabits, type Habit } from '@/database';
+import { useAuth } from '@/providers/auth-provider';
 import { useDatabase } from '@/providers/database-provider';
+import { pullHabits } from '@/services/habits-sync';
 
 export default function HabitsListScreen() {
   const { isReady } = useDatabase();
+  const { token, user } = useAuth();
   const [habits, setHabits] = useState<Habit[]>([]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
+    if (token && user) {
+      await pullHabits(token, user.id);
+    }
+
     const habitsData = await listHabits();
     setHabits(habitsData);
-  };
+  }, [token, user]);
 
   useFocusEffect(
     useCallback(() => {
@@ -29,43 +36,46 @@ export default function HabitsListScreen() {
       }, 0);
 
       return () => clearTimeout(timerId);
-    }, [isReady]),
+    }, [isReady, loadData]),
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent}>
-      <ThemedView style={styles.container}>
-        <View style={styles.content}>
-          <View style={styles.titleRow}>
-            <View style={styles.titleIcon}>
-              <MaterialDesignIcons name="fire" size={18} color="#FFFFFF" />
+    <ThemedView style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.container}>
+          <View style={styles.content}>
+            <View style={styles.titleRow}>
+              <View style={styles.titleIcon}>
+                <MaterialDesignIcons name="fire" size={18} color="#FFFFFF" />
+              </View>
+
+              <ThemedText style={styles.title}>Mis habitos</ThemedText>
             </View>
 
-            <ThemedText style={styles.title}>Mis habitos</ThemedText>
+            <ThemedText themeColor="textSecondary" style={styles.subtitle}>
+              Listado de Habitos
+            </ThemedText>
+
+            {habits.length === 0 ? (
+              <ThemedText themeColor="textSecondary">Todavia no hay habitos cargados.</ThemedText>
+            ) : (
+              habits.map((habit) => (
+                <Pressable
+                  key={habit.local_id}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/habits/[habitId]',
+                      params: { habitId: habit.local_id },
+                    })
+                  }
+                  style={({ pressed }) => [styles.habitCard, pressed && styles.buttonPressed]}>
+                  <ThemedText>{habit.nombre}</ThemedText>
+                </Pressable>
+              ))
+            )}
           </View>
-
-          <ThemedText themeColor="textSecondary" style={styles.subtitle}>
-            Listado de Habitos
-          </ThemedText>
-
-          {habits.length === 0 ? (
-            <ThemedText themeColor="textSecondary">Todavia no hay habitos cargados.</ThemedText>
-          ) : (
-            habits.map((habit) => (
-              <Pressable
-                key={habit.local_id}
-                onPress={() =>
-                  router.push({
-                    pathname: '/habits/[habitId]',
-                    params: { habitId: habit.local_id },
-                  })
-                }
-                style={({ pressed }) => [styles.habitCard, pressed && styles.buttonPressed]}>
-                <ThemedText>{habit.nombre}</ThemedText>
-              </Pressable>
-            ))
-          )}
         </View>
+      </ScrollView>
 
         <Pressable
           onPress={() => router.push('/habits/create')}
@@ -73,12 +83,14 @@ export default function HabitsListScreen() {
           <MaterialDesignIcons name="plus" size={22} color="#FFFFFF" />
           <ThemedText style={styles.floatingButtonText}>Crear Habito</ThemedText>
         </Pressable>
-      </ThemedView>
-    </ScrollView>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
   },
@@ -126,7 +138,7 @@ const styles = StyleSheet.create({
   floatingButton: {
     position: 'absolute',
     right: 24,
-    bottom: BottomTabInset + 52,
+    bottom: BottomTabInset + 92,
     minHeight: 52,
     borderRadius: 999,
     backgroundColor: '#1E1E24',

@@ -105,3 +105,17 @@ export async function deleteRoutineDaysByRoutineId(rutinaLocalId: string): Promi
     [rutinaLocalId],
   );
 }
+
+export async function replaceRoutineDays(
+  rutinaLocalId: string,
+  dias: RoutineDayValue[],
+): Promise<void> {
+  await deleteRoutineDaysByRoutineId(rutinaLocalId);
+
+  for (const dia of dias) {
+    await createRoutineDay({
+      rutinaLocalId,
+      diaSemana: dia,
+    });
+  }
+}

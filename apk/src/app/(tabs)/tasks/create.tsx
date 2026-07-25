@@ -5,21 +5,26 @@ import MaterialDesignIcons from '@react-native-vector-icons/material-design-icon
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { createHabit } from '@/database';
+import { createTask } from '@/database';
 import { useAuth } from '@/providers/auth-provider';
 import { useDatabase } from '@/providers/database-provider';
-import { syncHabits } from '@/services/habits-sync';
+import { syncScheduledNotificationsAsync } from '@/services/notifications';
+import { syncTasks } from '@/services/tasks-sync';
 
-export default function HabitsCreateScreen() {
+export default function TasksCreateScreen() {
   const { token, user } = useAuth();
   const { refreshStatus } = useDatabase();
   const inputRef = useRef<TextInput>(null);
-  const [nombre, setNombre] = useState('');
+  const [titulo, setTitulo] = useState('');
+  const [horaInicio, setHoraInicio] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
-  const [labelAnimation] = useState(() => new Animated.Value(0));
-  const [underlineAnimation] = useState(() => new Animated.Value(0));
+  const [isTitleFocused, setIsTitleFocused] = useState(false);
+  const [isHourFocused, setIsHourFocused] = useState(false);
+  const [titleLabelAnimation] = useState(() => new Animated.Value(0));
+  const [titleUnderlineAnimation] = useState(() => new Animated.Value(0));
+  const [hourLabelAnimation] = useState(() => new Animated.Value(0));
+  const [hourUnderlineAnimation] = useState(() => new Animated.Value(0));
 
   useFocusEffect(
     useCallback(() => {
@@ -32,26 +37,54 @@ export default function HabitsCreateScreen() {
   );
 
   useEffect(() => {
-    Animated.timing(labelAnimation, {
-      toValue: isFocused || nombre.trim().length > 0 ? 1 : 0,
+    Animated.timing(titleLabelAnimation, {
+      toValue: isTitleFocused || titulo.trim().length > 0 ? 1 : 0,
       duration: 180,
       easing: Easing.out(Easing.ease),
       useNativeDriver: true,
     }).start();
-  }, [isFocused, labelAnimation, nombre]);
+  }, [isTitleFocused, titleLabelAnimation, titulo]);
 
   useEffect(() => {
-    Animated.timing(underlineAnimation, {
-      toValue: isFocused ? 1 : 0,
+    Animated.timing(titleUnderlineAnimation, {
+      toValue: isTitleFocused ? 1 : 0,
       duration: 180,
       easing: Easing.out(Easing.ease),
       useNativeDriver: true,
     }).start();
-  }, [isFocused, underlineAnimation]);
+  }, [isTitleFocused, titleUnderlineAnimation]);
 
-  async function handleCreateHabit() {
-    if (!nombre.trim()) {
-      setError('Escribi un nombre para el habito.');
+  useEffect(() => {
+    Animated.timing(hourLabelAnimation, {
+      toValue: isHourFocused || horaInicio.trim().length > 0 ? 1 : 0,
+      duration: 180,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  }, [horaInicio, hourLabelAnimation, isHourFocused]);
+
+  useEffect(() => {
+    Animated.timing(hourUnderlineAnimation, {
+      toValue: isHourFocused ? 1 : 0,
+      duration: 180,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  }, [hourUnderlineAnimation, isHourFocused]);
+
+  function formatHourInput(value: string): string {
+    const digits = value.replace(/\D/g, '').slice(0, 4);
+
+    if (digits.length <= 2) {
+      return digits;
+    }
+
+    return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+  }
+
+  async function handleCreateTask() {
+    if (!titulo.trim()) {
+      setError('Escribi un titulo para la tarea.');
       return;
     }
 
@@ -59,20 +92,23 @@ export default function HabitsCreateScreen() {
       setSubmitting(true);
       setError(null);
 
-      await createHabit({
+      await createTask({
         userRemoteId: user?.id ?? null,
-        nombre,
+        titulo,
+        horaInicio,
       });
 
       if (token && user) {
-        await syncHabits(token, user.id);
+        await syncTasks(token, user.id);
       }
 
-      setNombre('');
+      await syncScheduledNotificationsAsync();
+      setTitulo('');
+      setHoraInicio('');
       await refreshStatus();
-      router.replace('/habits');
+      router.replace('/home');
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : 'No se pudo guardar el habito.');
+      setError(createError instanceof Error ? createError.message : 'No se pudo guardar la tarea.');
     } finally {
       setSubmitting(false);
     }
@@ -84,7 +120,7 @@ export default function HabitsCreateScreen() {
         <View style={styles.content}>
           <View style={styles.headerRow}>
             <Pressable
-              onPress={() => router.replace('/habits')}
+              onPress={() => router.replace('/home')}
               hitSlop={12}
               style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}>
               <ThemedText style={styles.backButtonText}>{'<'}</ThemedText>
@@ -93,14 +129,14 @@ export default function HabitsCreateScreen() {
             <View style={styles.headerTitleBlock}>
               <View style={styles.headerTitleRow}>
                 <View style={styles.headerTitleIcon}>
-                  <MaterialDesignIcons name="fire" size={16} color="#FFFFFF" />
+                  <MaterialDesignIcons name="check-circle-outline" size={16} color="#FFFFFF" />
                 </View>
 
-                <ThemedText style={styles.headerTitle}>Define tu Habito</ThemedText>
+                <ThemedText style={styles.headerTitle}>Nueva Tarea</ThemedText>
               </View>
 
               <ThemedText themeColor="textSecondary" style={styles.headerSubtitle}>
-                Crea un nombre simple para empezar
+                Crea una tarea puntual para hoy
               </ThemedText>
             </View>
 
@@ -114,16 +150,16 @@ export default function HabitsCreateScreen() {
                 style={[
                   styles.floatingLabel,
                   {
-                    color: isFocused || nombre.trim().length > 0 ? '#E4E4E7' : '#A1A1AA',
+                    color: isTitleFocused || titulo.trim().length > 0 ? '#E4E4E7' : '#A1A1AA',
                     transform: [
                       {
-                        translateY: labelAnimation.interpolate({
+                        translateY: titleLabelAnimation.interpolate({
                           inputRange: [0, 1],
                           outputRange: [20, 2],
                         }),
                       },
                       {
-                        scale: labelAnimation.interpolate({
+                        scale: titleLabelAnimation.interpolate({
                           inputRange: [0, 1],
                           outputRange: [1, 0.78],
                         }),
@@ -131,16 +167,16 @@ export default function HabitsCreateScreen() {
                     ],
                   },
                 ]}>
-                Habito
+                Tarea
               </Animated.Text>
 
               <TextInput
                 ref={inputRef}
                 style={styles.input}
-                value={nombre}
-                onChangeText={setNombre}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
+                value={titulo}
+                onChangeText={setTitulo}
+                onFocus={() => setIsTitleFocused(true)}
+                onBlur={() => setIsTitleFocused(false)}
               />
 
               <View style={styles.inputLineBase} />
@@ -148,10 +184,65 @@ export default function HabitsCreateScreen() {
                 style={[
                   styles.inputLineActive,
                   {
-                    opacity: underlineAnimation,
+                    opacity: titleUnderlineAnimation,
                     transform: [
                       {
-                        scaleX: underlineAnimation.interpolate({
+                        scaleX: titleUnderlineAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.35, 1],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Animated.Text
+                pointerEvents="none"
+                style={[
+                  styles.floatingLabel,
+                  {
+                    color: isHourFocused || horaInicio.trim().length > 0 ? '#E4E4E7' : '#A1A1AA',
+                    transform: [
+                      {
+                        translateY: hourLabelAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [20, 2],
+                        }),
+                      },
+                      {
+                        scale: hourLabelAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [1, 0.78],
+                        }),
+                      },
+                    ],
+                  },
+                ]}>
+                Hora (HH:MM)
+              </Animated.Text>
+
+              <TextInput
+                keyboardType="number-pad"
+                maxLength={5}
+                style={styles.input}
+                value={horaInicio}
+                onChangeText={(value) => setHoraInicio(formatHourInput(value))}
+                onFocus={() => setIsHourFocused(true)}
+                onBlur={() => setIsHourFocused(false)}
+              />
+
+              <View style={styles.inputLineBase} />
+              <Animated.View
+                style={[
+                  styles.inputLineActive,
+                  {
+                    opacity: hourUnderlineAnimation,
+                    transform: [
+                      {
+                        scaleX: hourUnderlineAnimation.interpolate({
                           inputRange: [0, 1],
                           outputRange: [0.35, 1],
                         }),
@@ -166,10 +257,10 @@ export default function HabitsCreateScreen() {
 
             <Pressable
               disabled={submitting}
-              onPress={handleCreateHabit}
+              onPress={handleCreateTask}
               style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, submitting && styles.buttonDisabled]}>
               <ThemedText style={styles.buttonText}>
-                {submitting ? 'Guardando...' : 'Guardar habito'}
+                {submitting ? 'Guardando...' : 'Guardar tarea'}
               </ThemedText>
             </Pressable>
           </View>

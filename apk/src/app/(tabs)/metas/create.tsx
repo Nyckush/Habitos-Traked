@@ -5,12 +5,12 @@ import MaterialDesignIcons from '@react-native-vector-icons/material-design-icon
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { createHabit } from '@/database';
+import { createMeta } from '@/database';
 import { useAuth } from '@/providers/auth-provider';
 import { useDatabase } from '@/providers/database-provider';
-import { syncHabits } from '@/services/habits-sync';
+import { syncMetas } from '@/services/goals-sync';
 
-export default function HabitsCreateScreen() {
+export default function MetasCreateScreen() {
   const { token, user } = useAuth();
   const { refreshStatus } = useDatabase();
   const inputRef = useRef<TextInput>(null);
@@ -49,9 +49,9 @@ export default function HabitsCreateScreen() {
     }).start();
   }, [isFocused, underlineAnimation]);
 
-  async function handleCreateHabit() {
+  async function handleCreateMeta() {
     if (!nombre.trim()) {
-      setError('Escribi un nombre para el habito.');
+      setError('Escribi un nombre para la meta.');
       return;
     }
 
@@ -59,20 +59,20 @@ export default function HabitsCreateScreen() {
       setSubmitting(true);
       setError(null);
 
-      await createHabit({
+      await createMeta({
         userRemoteId: user?.id ?? null,
         nombre,
       });
 
       if (token && user) {
-        await syncHabits(token, user.id);
+        await syncMetas(token, user.id);
       }
 
       setNombre('');
       await refreshStatus();
-      router.replace('/habits');
+      router.replace('/metas');
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : 'No se pudo guardar el habito.');
+      setError(createError instanceof Error ? createError.message : 'No se pudo guardar la meta.');
     } finally {
       setSubmitting(false);
     }
@@ -84,7 +84,7 @@ export default function HabitsCreateScreen() {
         <View style={styles.content}>
           <View style={styles.headerRow}>
             <Pressable
-              onPress={() => router.replace('/habits')}
+              onPress={() => router.replace('/metas')}
               hitSlop={12}
               style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}>
               <ThemedText style={styles.backButtonText}>{'<'}</ThemedText>
@@ -93,14 +93,14 @@ export default function HabitsCreateScreen() {
             <View style={styles.headerTitleBlock}>
               <View style={styles.headerTitleRow}>
                 <View style={styles.headerTitleIcon}>
-                  <MaterialDesignIcons name="fire" size={16} color="#FFFFFF" />
+                  <MaterialDesignIcons name="trophy-outline" size={16} color="#FFFFFF" />
                 </View>
 
-                <ThemedText style={styles.headerTitle}>Define tu Habito</ThemedText>
+                <ThemedText style={styles.headerTitle}>Define tu Meta</ThemedText>
               </View>
 
               <ThemedText themeColor="textSecondary" style={styles.headerSubtitle}>
-                Crea un nombre simple para empezar
+                Crea una meta clara para empezar
               </ThemedText>
             </View>
 
@@ -131,7 +131,7 @@ export default function HabitsCreateScreen() {
                     ],
                   },
                 ]}>
-                Habito
+                Meta
               </Animated.Text>
 
               <TextInput
@@ -166,11 +166,9 @@ export default function HabitsCreateScreen() {
 
             <Pressable
               disabled={submitting}
-              onPress={handleCreateHabit}
+              onPress={handleCreateMeta}
               style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, submitting && styles.buttonDisabled]}>
-              <ThemedText style={styles.buttonText}>
-                {submitting ? 'Guardando...' : 'Guardar habito'}
-              </ThemedText>
+              <ThemedText style={styles.buttonText}>{submitting ? 'Guardando...' : 'Guardar meta'}</ThemedText>
             </Pressable>
           </View>
         </View>

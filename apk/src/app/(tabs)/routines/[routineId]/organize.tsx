@@ -13,7 +13,9 @@ import {
   type Habit,
   type RoutineHabitLink,
 } from '@/database';
+import { useAuth } from '@/providers/auth-provider';
 import { useDatabase } from '@/providers/database-provider';
+import { pullRoutineHabitLinks } from '@/services/routine-habit-links-sync';
 
 function resolveRoutineId(value: string | string[] | undefined): string {
   if (Array.isArray(value)) {
@@ -26,6 +28,7 @@ function resolveRoutineId(value: string | string[] | undefined): string {
 export default function RoutineOrganizeScreen() {
   const { routineId } = useLocalSearchParams<{ routineId?: string | string[] }>();
   const { isReady } = useDatabase();
+  const { token } = useAuth();
   const [routineName, setRoutineName] = useState('');
   const [habits, setHabits] = useState<Habit[]>([]);
   const [routineHabitLinks, setRoutineHabitLinks] = useState<RoutineHabitLink[]>([]);
@@ -49,6 +52,10 @@ export default function RoutineOrganizeScreen() {
       return;
     }
 
+    if (token) {
+      await pullRoutineHabitLinks(token);
+    }
+
     const [habitsData, linksData] = await Promise.all([listHabits(), listRoutineHabitLinks()]);
 
     setRoutineName(routine.nombre);
@@ -56,7 +63,7 @@ export default function RoutineOrganizeScreen() {
     setRoutineHabitLinks(linksData);
     setScreenError(null);
     setIsLoaded(true);
-  }, [isReady, localRoutineId]);
+  }, [isReady, localRoutineId, token]);
 
   useFocusEffect(
     useCallback(() => {
@@ -126,50 +133,41 @@ export default function RoutineOrganizeScreen() {
   }, [isLoaded, pulseGlow, pulseScale, routineHasHabits]);
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent}>
-      <ThemedView style={styles.container}>
-        <View style={styles.content}>
-          <View style={styles.headerRow}>
-            <Pressable
-              onPress={() => router.replace({ pathname: '/routines/[routineId]', params: { routineId: localRoutineId } })}
-              hitSlop={12}
-              style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}>
-              <ThemedText style={styles.backButtonText}>{'<'}</ThemedText>
-            </Pressable>
+    <ThemedView style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.container}>
+          <View style={styles.content}>
+            <View style={styles.headerRow}>
+              <Pressable
+                onPress={() => router.replace({ pathname: '/routines/[routineId]', params: { routineId: localRoutineId } })}
+                hitSlop={12}
+                style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}>
+                <ThemedText style={styles.backButtonText}>{'<'}</ThemedText>
+              </Pressable>
 
-            <View style={styles.headerTitleBlock}>
-              <View style={styles.headerTitleRow}>
-                <View style={styles.headerTitleIcon}>
-                  <MaterialDesignIcons name="repeat" size={16} color="#FFFFFF" />
+              <View style={styles.headerTitleBlock}>
+                <View style={styles.headerTitleRow}>
+                  <View style={styles.headerTitleIcon}>
+                    <MaterialDesignIcons name="repeat" size={16} color="#FFFFFF" />
+                  </View>
+
+                  <ThemedText style={styles.headerTitle}>Organiza tu Rutina</ThemedText>
                 </View>
-
-                <ThemedText style={styles.headerTitle}>Organiza tu Rutina</ThemedText>
               </View>
 
-             
+              <View style={styles.headerSpacer} />
             </View>
 
-            <View style={styles.headerSpacer} />
+            <ThemedText themeColor="textSecondary" style={styles.routineSubtitle}>
+              {`Rutina : ${routineName || 'Sin nombre'}`}
+            </ThemedText>
+
+            {!isLoaded ? (
+              <ThemedText themeColor="textSecondary">Cargando rutina...</ThemedText>
+            ) : screenError ? (
+              <ThemedText style={styles.errorText}>{screenError}</ThemedText>
+            ) : null}
           </View>
-
-          <ThemedText themeColor="textSecondary" style={styles.routineSubtitle}>
-            {`Rutina : ${routineName || 'Sin nombre'}`}
-          </ThemedText>
-
-          {!isLoaded ? (
-            <ThemedText themeColor="textSecondary">Cargando rutina...</ThemedText>
-          ) : screenError ? (
-            <ThemedText style={styles.errorText}>{screenError}</ThemedText>
-          ) : null}
-
-        </View>
-
-        {isLoaded && !screenError && !routineHasHabits ? (
-          <View pointerEvents="none" style={styles.emptyStateOverlay}>
-            <ThemedText style={styles.emptyStateText}>Ingresa tu Primer habito ...</ThemedText>
-          </View>
-        ) : null}
-
         {isLoaded && !screenError && routineHasHabits ? (
           <View style={styles.linkedHabitsList}>
             {routineHabitLinks
@@ -177,53 +175,77 @@ export default function RoutineOrganizeScreen() {
               .map((link) => {
                 const habit = habits.find((item) => item.local_id === link.habito_local_id);
 
-                if (!habit) {
-                  return null;
-                }
+                  if (!habit) {
+                    return null;
+                  }
 
                 return (
-                  <View key={link.local_id} style={styles.linkedHabitCard}>
+                  <Pressable
+                    key={link.local_id}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/routines/[routineId]/habits/[habitId]',
+                        params: {
+                          routineId: localRoutineId,
+                          habitId: habit.local_id,
+                        },
+                      })
+                    }
+                    style={({ pressed }) => [
+                      styles.linkedHabitCard,
+                      pressed && styles.buttonPressed,
+                    ]}>
                     <ThemedText>{habit.nombre}</ThemedText>
                     <ThemedText themeColor="textSecondary">
                       {link.hora_inicio ? `Hora : ${link.hora_inicio}` : 'Hora sin definir'}
                     </ThemedText>
-                  </View>
+                  </Pressable>
                 );
               })}
           </View>
         ) : null}
+        </View>
+      </ScrollView>
 
-        {isLoaded && !screenError ? (
+      {isLoaded && !screenError && !routineHasHabits ? (
+        <View pointerEvents="none" style={styles.emptyStateOverlay}>
+          <ThemedText style={styles.emptyStateText}>Ingresa tu Primer habito ...</ThemedText>
+        </View>
+      ) : null}
+
+      {isLoaded && !screenError ? (
           <Animated.View
             style={[
               styles.floatingButtonWrap,
               {
                 transform: [{ scale: pulseScale }],
                 shadowOpacity: routineHasHabits ? 0.18 : pulseGlow,
-              },
+            },
+          ]}>
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: '/routines/[routineId]/habits',
+                params: { routineId: localRoutineId },
+              })
+            }
+            style={({ pressed }) => [
+              styles.floatingButton,
+              pressed && styles.buttonPressed,
             ]}>
-            <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: '/routines/[routineId]/habits',
-                  params: { routineId: localRoutineId },
-                })
-              }
-              style={({ pressed }) => [
-                styles.floatingButton,
-                pressed && styles.buttonPressed,
-              ]}>
-              <MaterialDesignIcons name="plus" size={22} color="#FFFFFF" />
-              <ThemedText style={styles.floatingButtonText}>Agregar habito</ThemedText>
-            </Pressable>
-          </Animated.View>
-        ) : null}
-      </ThemedView>
-    </ScrollView>
+            <MaterialDesignIcons name="plus" size={22} color="#FFFFFF" />
+            <ThemedText style={styles.floatingButtonText}>Agregar habito</ThemedText>
+          </Pressable>
+        </Animated.View>
+      ) : null}
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
   },
@@ -304,7 +326,7 @@ const styles = StyleSheet.create({
   floatingButtonWrap: {
     position: 'absolute',
     right: 24,
-    bottom: BottomTabInset + 52,
+    bottom: BottomTabInset + 92,
     minHeight: 52,
     borderRadius: 999,
     backgroundColor: '#1E1E24',

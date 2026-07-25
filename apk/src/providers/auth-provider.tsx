@@ -3,8 +3,20 @@ import Constants from 'expo-constants';
 import { createContext, type PropsWithChildren, use, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
-import { clearCurrentAuthUser, getCurrentAuthUser, setCurrentAuthUser } from '@/database';
+import {
+  clearCurrentAuthUser,
+  clearLocalDomainData,
+  getCurrentAuthUser,
+  setCurrentAuthUser,
+  updateCurrentAuthUser,
+} from '@/database';
 import { authApi, type AuthUser, type LoginPayload, type RegisterPayload } from '@/services';
+import { pullGoals, syncGoals } from '@/services/goals-sync';
+import { pullHabits, syncHabits } from '@/services/habits-sync';
+import { pullHabitRecords, syncHabitRecords } from '@/services/habit-records-sync';
+import { pullRoutineHabitLinks, syncRoutineHabitLinks } from '@/services/routine-habit-links-sync';
+import { pullRoutines, syncRoutines } from '@/services/routines-sync';
+import { pullTasks, syncTasks } from '@/services/tasks-sync';
 
 type AuthContextValue = {
   isLoading: boolean;
@@ -13,6 +25,7 @@ type AuthContextValue = {
   signIn: (payload: LoginPayload) => Promise<void>;
   signUp: (payload: RegisterPayload) => Promise<void>;
   signOut: () => Promise<void>;
+  updateProfile: (payload: { username: string; perfil: string | null }) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -92,6 +105,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
         setToken(storedToken);
         setUser(response.user);
+        await pullHabits(storedToken, response.user.id);
+        await pullRoutines(storedToken, response.user.id);
+        await pullRoutineHabitLinks(storedToken);
+        await pullHabitRecords(storedToken);
+        await pullGoals(storedToken, response.user.id);
+        await pullTasks(storedToken, response.user.id);
       } catch {
         const storedToken = await getStoredToken();
         const localUser = await getCurrentAuthUser();
@@ -142,7 +161,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
       device_name: payload.device_name ?? getDeviceName(),
     });
 
+    await clearLocalDomainData();
     await persistSession(response.token, response.user);
+    await pullHabits(response.token, response.user.id);
+    await pullRoutines(response.token, response.user.id);
+    await pullRoutineHabitLinks(response.token);
+    await pullHabitRecords(response.token);
+    await pullGoals(response.token, response.user.id);
+    await pullTasks(response.token, response.user.id);
   }
 
   async function signUp(payload: RegisterPayload) {
@@ -152,6 +178,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
     });
 
     await persistSession(response.token, response.user);
+    await syncHabits(response.token, response.user.id);
+    await syncRoutines(response.token, response.user.id);
+    await syncRoutineHabitLinks(response.token);
+    await syncHabitRecords(response.token);
+    await syncGoals(response.token, response.user.id);
+    await syncTasks(response.token, response.user.id);
   }
 
   async function signOut() {
@@ -166,9 +198,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
 
     await deleteStoredToken();
+    await clearLocalDomainData();
     await clearCurrentAuthUser();
     setToken(null);
     setUser(null);
+  }
+
+  async function updateProfile(payload: { username: string; perfil: string | null }) {
+    const nextUser = await updateCurrentAuthUser(payload);
+    setUser(nextUser);
   }
 
   return (
@@ -180,6 +218,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         signIn,
         signUp,
         signOut,
+        updateProfile,
       }}>
       {children}
     </AuthContext.Provider>

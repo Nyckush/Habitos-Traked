@@ -12,7 +12,9 @@ import {
   type Habit,
   type RoutineHabitLink,
 } from '@/database';
+import { useAuth } from '@/providers/auth-provider';
 import { useDatabase } from '@/providers/database-provider';
+import { pullRoutineHabitLinks } from '@/services/routine-habit-links-sync';
 
 function resolveRoutineId(value: string | string[] | undefined): string {
   if (Array.isArray(value)) {
@@ -25,6 +27,7 @@ function resolveRoutineId(value: string | string[] | undefined): string {
 export default function RoutineSelectableHabitsScreen() {
   const { routineId } = useLocalSearchParams<{ routineId?: string | string[] }>();
   const { isReady } = useDatabase();
+  const { token } = useAuth();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [links, setLinks] = useState<RoutineHabitLink[]>([]);
   const [screenError, setScreenError] = useState<string | null>(null);
@@ -45,13 +48,17 @@ export default function RoutineSelectableHabitsScreen() {
       return;
     }
 
+    if (token) {
+      await pullRoutineHabitLinks(token);
+    }
+
     const [habitsData, linksData] = await Promise.all([listHabits(), listRoutineHabitLinks()]);
 
     setHabits(habitsData);
     setLinks(linksData);
     setScreenError(null);
     setIsLoaded(true);
-  }, [isReady, localRoutineId]);
+  }, [isReady, localRoutineId, token]);
 
   useFocusEffect(
     useCallback(() => {

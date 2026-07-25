@@ -6,7 +6,9 @@ import MaterialDesignIcons from '@react-native-vector-icons/material-design-icon
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { deleteHabit, getHabitById, updateHabit } from '@/database';
+import { useAuth } from '@/providers/auth-provider';
 import { useDatabase } from '@/providers/database-provider';
+import { syncHabits } from '@/services/habits-sync';
 
 function resolveHabitId(value: string | string[] | undefined): string {
   if (Array.isArray(value)) {
@@ -18,6 +20,7 @@ function resolveHabitId(value: string | string[] | undefined): string {
 
 export default function HabitEditScreen() {
   const { habitId } = useLocalSearchParams<{ habitId?: string | string[] }>();
+  const { token, user } = useAuth();
   const { isReady, refreshStatus } = useDatabase();
   const inputRef = useRef<TextInput>(null);
   const [nombre, setNombre] = useState('');
@@ -110,6 +113,10 @@ export default function HabitEditScreen() {
         nombre,
       });
 
+      if (token && user) {
+        await syncHabits(token, user.id);
+      }
+
       await refreshStatus();
       router.replace('/habits');
     } catch (updateError) {
@@ -141,6 +148,11 @@ export default function HabitEditScreen() {
       setError(null);
 
       await deleteHabit(localHabitId);
+
+      if (token && user) {
+        await syncHabits(token, user.id);
+      }
+
       await refreshStatus();
       router.replace('/habits');
     } catch (deleteError) {

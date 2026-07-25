@@ -15,7 +15,10 @@ import {
   updateRoutine,
   createRoutineDay,
 } from '@/database';
+import { useAuth } from '@/providers/auth-provider';
 import { useDatabase } from '@/providers/database-provider';
+import { syncScheduledNotificationsAsync } from '@/services/notifications';
+import { syncRoutines } from '@/services/routines-sync';
 
 function resolveRoutineId(value: string | string[] | undefined): string {
   if (Array.isArray(value)) {
@@ -27,6 +30,7 @@ function resolveRoutineId(value: string | string[] | undefined): string {
 
 export default function RoutineEditScreen() {
   const { routineId } = useLocalSearchParams<{ routineId?: string | string[] }>();
+  const { token, user } = useAuth();
   const { isReady, refreshStatus } = useDatabase();
   const inputRef = useRef<TextInput>(null);
   const [nombre, setNombre] = useState('');
@@ -147,6 +151,11 @@ export default function RoutineEditScreen() {
         ),
       );
 
+      if (token && user) {
+        await syncRoutines(token, user.id);
+      }
+
+      await syncScheduledNotificationsAsync();
       await refreshStatus();
       router.replace('/routines');
     } catch (updateError) {
@@ -178,6 +187,12 @@ export default function RoutineEditScreen() {
       setError(null);
 
       await deleteRoutine(localRoutineId);
+
+      if (token && user) {
+        await syncRoutines(token, user.id);
+      }
+
+      await syncScheduledNotificationsAsync();
       await refreshStatus();
       router.replace('/routines');
     } catch (deleteError) {

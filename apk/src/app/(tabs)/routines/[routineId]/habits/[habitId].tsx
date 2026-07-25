@@ -1,12 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, Animated, Easing, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { createRoutineHabitLink, getHabitById, getRoutineById } from '@/database';
+import {
+  createRoutineHabitLink,
+  deleteRoutineHabitLink,
+  getHabitById,
+  getRoutineById,
+  listRoutineHabitLinks,
+  updateRoutineHabitLink,
+} from '@/database';
+import { useAuth } from '@/providers/auth-provider';
 import { useDatabase } from '@/providers/database-provider';
+import { syncHabits } from '@/services/habits-sync';
+import { syncScheduledNotificationsAsync } from '@/services/notifications';
+import { syncRoutineHabitLinks } from '@/services/routine-habit-links-sync';
+import { syncRoutines } from '@/services/routines-sync';
 
 function resolveParam(value: string | string[] | undefined): string {
   if (Array.isArray(value)) {
@@ -38,10 +50,12 @@ function isValidHour(value: string): boolean {
 
 export default function RoutineHabitHourScreen() {
   const params = useLocalSearchParams<{ routineId?: string | string[]; habitId?: string | string[] }>();
+  const { token, user } = useAuth();
   const { isReady, refreshStatus } = useDatabase();
   const inputRef = useRef<TextInput>(null);
   const [habitName, setHabitName] = useState('');
   const [horaInicio, setHoraInicio] = useState('');
+  const [existingLinkId, setExistingLinkId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [screenError, setScreenError] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -58,9 +72,10 @@ export default function RoutineHabitHourScreen() {
       return;
     }
 
-    const [routine, habit] = await Promise.all([
+    const [routine, habit, links] = await Promise.all([
       getRoutineById(localRoutineId),
       getHabitById(localHabitId),
+      listRoutineHabitLinks(),
     ]);
 
     if (!routine || !habit) {
@@ -70,6 +85,13 @@ export default function RoutineHabitHourScreen() {
     }
 
     setHabitName(habit.nombre);
+    const currentLink = links.find(
+      (link) =>
+        link.rutina_local_id === localRoutineId &&
+        link.habito_local_id === localHabitId,
+    );
+    setExistingLinkId(currentLink?.local_id ?? null);
+    setHoraInicio(currentLink?.hora_inicio ?? '');
     setScreenError(null);
     setIsLoaded(true);
   }, [isReady, localHabitId, localRoutineId]);
@@ -81,7 +103,7 @@ export default function RoutineHabitHourScreen() {
       }
 
       setIsLoaded(false);
-      setHoraInicio('');
+      setExistingLinkId(null);
       setError(null);
 
       const timerId = setTimeout(() => {
@@ -91,6 +113,7 @@ export default function RoutineHabitHourScreen() {
       return () => {
         clearTimeout(timerId);
         setHoraInicio('');
+        setExistingLinkId(null);
         setError(null);
       };
     }, [isReady, localHabitId, localRoutineId, loadData]),
@@ -141,12 +164,26 @@ export default function RoutineHabitHourScreen() {
       setSubmitting(true);
       setError(null);
 
-      await createRoutineHabitLink({
-        rutinaLocalId: localRoutineId,
-        habitoLocalId: localHabitId,
-        horaInicio,
-      });
+      if (existingLinkId) {
+        await updateRoutineHabitLink({
+          localId: existingLinkId,
+          horaInicio,
+        });
+      } else {
+        await createRoutineHabitLink({
+          rutinaLocalId: localRoutineId,
+          habitoLocalId: localHabitId,
+          horaInicio,
+        });
+      }
 
+      if (token && user) {
+        await syncHabits(token, user.id);
+        await syncRoutines(token, user.id);
+        await syncRoutineHabitLinks(token);
+      }
+
+      await syncScheduledNotificationsAsync();
       setHoraInicio('');
       await refreshStatus();
       router.replace({
@@ -155,6 +192,58 @@ export default function RoutineHabitHourScreen() {
       });
     } catch (linkError) {
       setError(linkError instanceof Error ? linkError.message : 'No se pudo guardar el habito.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function confirmDeleteLink() {
+    if (!existingLinkId) {
+      return;
+    }
+
+    Alert.alert('Eliminar habito', '¿Seguro que queres quitar este habito de la rutina?', [
+      {
+        text: 'Cancelar',
+        style: 'cancel',
+      },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: () => {
+          void handleDeleteLink();
+        },
+      },
+    ]);
+  }
+
+  async function handleDeleteLink() {
+    if (!existingLinkId) {
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError(null);
+
+      await deleteRoutineHabitLink(existingLinkId);
+
+      if (token && user) {
+        await syncRoutineHabitLinks(token);
+      }
+
+      await syncScheduledNotificationsAsync();
+      await refreshStatus();
+      router.replace({
+        pathname: '/routines/[routineId]/organize',
+        params: { routineId: localRoutineId },
+      });
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : 'No se pudo eliminar el habito de la rutina.',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -269,9 +358,26 @@ export default function RoutineHabitHourScreen() {
                 onPress={handleSaveLink}
                 style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, submitting && styles.buttonDisabled]}>
                 <ThemedText style={styles.buttonText}>
-                  {submitting ? 'Guardando...' : 'Guardar habito'}
+                  {submitting
+                    ? 'Guardando...'
+                    : existingLinkId
+                      ? 'Guardar cambios'
+                      : 'Guardar habito'}
                 </ThemedText>
               </Pressable>
+
+              {existingLinkId ? (
+                <Pressable
+                  disabled={submitting}
+                  onPress={confirmDeleteLink}
+                  style={({ pressed }) => [
+                    styles.deleteButton,
+                    pressed && styles.buttonPressed,
+                    submitting && styles.buttonDisabled,
+                  ]}>
+                  <ThemedText style={styles.deleteButtonText}>Eliminar habito de la rutina</ThemedText>
+                </Pressable>
+              ) : null}
             </View>
           )}
         </View>
@@ -374,8 +480,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  deleteButton: {
+    minHeight: 48,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#7F1D1D',
+    backgroundColor: '#2A1114',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   buttonText: {
     color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  deleteButtonText: {
+    color: '#FCA5A5',
     fontWeight: '700',
   },
   buttonPressed: {

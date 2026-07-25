@@ -1,5 +1,5 @@
 export const DATABASE_NAME = 'habitracked.db';
-export const DATABASE_VERSION = 8;
+export const DATABASE_VERSION = 13;
 
 export const schemaStatements = [
   `
@@ -12,7 +12,8 @@ export const schemaStatements = [
     CREATE TABLE IF NOT EXISTS users (
       local_id TEXT PRIMARY KEY NOT NULL,
       remote_id INTEGER UNIQUE,
-      nombre TEXT NOT NULL,
+      username TEXT NOT NULL,
+      perfil TEXT,
       email TEXT NOT NULL,
       created_at TEXT,
       updated_at TEXT,
@@ -102,9 +103,9 @@ export const schemaStatements = [
       remote_id INTEGER UNIQUE,
       user_remote_id INTEGER,
       titulo TEXT NOT NULL,
-      descripcion TEXT,
+      hora_inicio TEXT,
       estado TEXT NOT NULL DEFAULT 'pendiente',
-      fecha_limite TEXT,
+      completed_at TEXT,
       created_at TEXT,
       updated_at TEXT,
       deleted_at TEXT,
@@ -131,7 +132,6 @@ export const schemaStatements = [
       remote_id INTEGER UNIQUE,
       user_remote_id INTEGER,
       meta_local_id TEXT,
-      habito_local_id TEXT NOT NULL,
       nombre TEXT NOT NULL,
       meta_esperada INTEGER NOT NULL,
       fecha_limite TEXT NOT NULL,
@@ -139,6 +139,19 @@ export const schemaStatements = [
       updated_at TEXT,
       sync_status TEXT NOT NULL DEFAULT 'pending_create'
         CHECK (sync_status IN ('synced', 'pending_create', 'pending_update', 'pending_delete', 'conflict'))
+    );
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS objetivo_habitos (
+      local_id TEXT PRIMARY KEY NOT NULL,
+      remote_id INTEGER UNIQUE,
+      objetivo_local_id TEXT NOT NULL,
+      habito_local_id TEXT NOT NULL,
+      created_at TEXT,
+      updated_at TEXT,
+      sync_status TEXT NOT NULL DEFAULT 'pending_create'
+        CHECK (sync_status IN ('synced', 'pending_create', 'pending_update', 'pending_delete', 'conflict')),
+      UNIQUE(objetivo_local_id, habito_local_id)
     );
   `,
   `
@@ -167,4 +180,5 @@ export const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_tareas_sync_status ON tareas(sync_status);`,
   `CREATE INDEX IF NOT EXISTS idx_metas_sync_status ON metas(sync_status);`,
   `CREATE INDEX IF NOT EXISTS idx_objetivos_sync_status ON objetivos(sync_status);`,
+  `CREATE INDEX IF NOT EXISTS idx_objetivo_habitos_sync_status ON objetivo_habitos(sync_status);`,
 ] as const;

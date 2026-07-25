@@ -1,34 +1,59 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { createHabit } from '@/database';
+import { getMetaById, updateMeta } from '@/database';
 import { useAuth } from '@/providers/auth-provider';
 import { useDatabase } from '@/providers/database-provider';
-import { syncHabits } from '@/services/habits-sync';
+import { syncMetas } from '@/services/goals-sync';
 
-export default function HabitsCreateScreen() {
+export default function MetaEditScreen() {
+  const { metaId } = useLocalSearchParams<{ metaId?: string }>();
   const { token, user } = useAuth();
   const { refreshStatus } = useDatabase();
   const inputRef = useRef<TextInput>(null);
   const [nombre, setNombre] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [isFocused, setIsFocused] = useState(false);
   const [labelAnimation] = useState(() => new Animated.Value(0));
   const [underlineAnimation] = useState(() => new Animated.Value(0));
 
+  const metaLocalId = typeof metaId === 'string' ? metaId : '';
+
+  const loadMeta = useCallback(async () => {
+    if (!metaLocalId) {
+      setError('No se encontro la meta.');
+      setLoading(false);
+      return;
+    }
+
+    const meta = await getMetaById(metaLocalId);
+
+    if (!meta) {
+      setError('No se encontro la meta.');
+      setLoading(false);
+      return;
+    }
+
+    setNombre(meta.nombre);
+    setLoading(false);
+  }, [metaLocalId]);
+
   useFocusEffect(
     useCallback(() => {
+      void loadMeta();
+
       const timerId = setTimeout(() => {
         inputRef.current?.focus();
       }, 50);
 
       return () => clearTimeout(timerId);
-    }, []),
+    }, [loadMeta]),
   );
 
   useEffect(() => {
@@ -49,9 +74,14 @@ export default function HabitsCreateScreen() {
     }).start();
   }, [isFocused, underlineAnimation]);
 
-  async function handleCreateHabit() {
+  async function handleSaveMeta() {
+    if (!metaLocalId) {
+      setError('No se encontro la meta.');
+      return;
+    }
+
     if (!nombre.trim()) {
-      setError('Escribi un nombre para el habito.');
+      setError('Escribi un nombre para la meta.');
       return;
     }
 
@@ -59,20 +89,19 @@ export default function HabitsCreateScreen() {
       setSubmitting(true);
       setError(null);
 
-      await createHabit({
-        userRemoteId: user?.id ?? null,
+      await updateMeta({
+        localId: metaLocalId,
         nombre,
       });
 
       if (token && user) {
-        await syncHabits(token, user.id);
+        await syncMetas(token, user.id);
       }
 
-      setNombre('');
       await refreshStatus();
-      router.replace('/habits');
-    } catch (createError) {
-      setError(createError instanceof Error ? createError.message : 'No se pudo guardar el habito.');
+      router.replace('/metas');
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'No se pudo actualizar la meta.');
     } finally {
       setSubmitting(false);
     }
@@ -84,7 +113,7 @@ export default function HabitsCreateScreen() {
         <View style={styles.content}>
           <View style={styles.headerRow}>
             <Pressable
-              onPress={() => router.replace('/habits')}
+              onPress={() => router.replace('/metas')}
               hitSlop={12}
               style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}>
               <ThemedText style={styles.backButtonText}>{'<'}</ThemedText>
@@ -93,14 +122,14 @@ export default function HabitsCreateScreen() {
             <View style={styles.headerTitleBlock}>
               <View style={styles.headerTitleRow}>
                 <View style={styles.headerTitleIcon}>
-                  <MaterialDesignIcons name="fire" size={16} color="#FFFFFF" />
+                  <MaterialDesignIcons name="trophy-outline" size={16} color="#FFFFFF" />
                 </View>
 
-                <ThemedText style={styles.headerTitle}>Define tu Habito</ThemedText>
+                <ThemedText style={styles.headerTitle}>Editar Meta</ThemedText>
               </View>
 
               <ThemedText themeColor="textSecondary" style={styles.headerSubtitle}>
-                Crea un nombre simple para empezar
+                Actualiza el nombre de tu meta
               </ThemedText>
             </View>
 
@@ -108,69 +137,71 @@ export default function HabitsCreateScreen() {
           </View>
 
           <View style={styles.formCard}>
-            <View style={styles.inputGroup}>
-              <Animated.Text
-                pointerEvents="none"
-                style={[
-                  styles.floatingLabel,
-                  {
-                    color: isFocused || nombre.trim().length > 0 ? '#E4E4E7' : '#A1A1AA',
-                    transform: [
-                      {
-                        translateY: labelAnimation.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [20, 2],
-                        }),
-                      },
-                      {
-                        scale: labelAnimation.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [1, 0.78],
-                        }),
-                      },
-                    ],
-                  },
-                ]}>
-                Habito
-              </Animated.Text>
+            {loading ? (
+              <ThemedText themeColor="textSecondary">Cargando meta...</ThemedText>
+            ) : (
+              <View style={styles.inputGroup}>
+                <Animated.Text
+                  pointerEvents="none"
+                  style={[
+                    styles.floatingLabel,
+                    {
+                      color: isFocused || nombre.trim().length > 0 ? '#E4E4E7' : '#A1A1AA',
+                      transform: [
+                        {
+                          translateY: labelAnimation.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [20, 2],
+                          }),
+                        },
+                        {
+                          scale: labelAnimation.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 0.78],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}>
+                  Meta
+                </Animated.Text>
 
-              <TextInput
-                ref={inputRef}
-                style={styles.input}
-                value={nombre}
-                onChangeText={setNombre}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-              />
+                <TextInput
+                  ref={inputRef}
+                  style={styles.input}
+                  value={nombre}
+                  onChangeText={setNombre}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setIsFocused(false)}
+                />
 
-              <View style={styles.inputLineBase} />
-              <Animated.View
-                style={[
-                  styles.inputLineActive,
-                  {
-                    opacity: underlineAnimation,
-                    transform: [
-                      {
-                        scaleX: underlineAnimation.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0.35, 1],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              />
-            </View>
+                <View style={styles.inputLineBase} />
+                <Animated.View
+                  style={[
+                    styles.inputLineActive,
+                    {
+                      opacity: underlineAnimation,
+                      transform: [
+                        {
+                          scaleX: underlineAnimation.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0.35, 1],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                />
+              </View>
+            )}
 
             {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
 
             <Pressable
-              disabled={submitting}
-              onPress={handleCreateHabit}
-              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, submitting && styles.buttonDisabled]}>
-              <ThemedText style={styles.buttonText}>
-                {submitting ? 'Guardando...' : 'Guardar habito'}
-              </ThemedText>
+              disabled={submitting || loading}
+              onPress={handleSaveMeta}
+              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, (submitting || loading) && styles.buttonDisabled]}>
+              <ThemedText style={styles.buttonText}>{submitting ? 'Guardando...' : 'Guardar cambios'}</ThemedText>
             </Pressable>
           </View>
         </View>

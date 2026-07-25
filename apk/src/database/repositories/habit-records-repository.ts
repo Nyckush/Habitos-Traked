@@ -1,4 +1,7 @@
+import type { RemoteHabitRecord } from '@/services';
+
 import { getDatabase } from '../client';
+import { getHabitByRemoteId } from './habits-repository';
 
 export type HabitRecord = {
   local_id: string;
@@ -134,4 +137,125 @@ export async function saveHabitRecord(input: SaveHabitRecordInput): Promise<Habi
   }
 
   return record;
+}
+
+export async function getHabitRecordByRemoteId(remoteId: number): Promise<HabitRecord | null> {
+  const records = await listHabitRecords();
+
+  return records.find((record) => record.remote_id === remoteId) ?? null;
+}
+
+export async function getHabitRecordByUniqueKey(
+  habitoLocalId: string,
+  fecha: string,
+): Promise<HabitRecord | null> {
+  const records = await listHabitRecords();
+
+  return records.find(
+    (record) => record.habito_local_id === habitoLocalId && record.fecha === fecha,
+  ) ?? null;
+}
+
+export async function markHabitRecordAsSynced(
+  localId: string,
+  remoteRecord: RemoteHabitRecord,
+  habitLocalId: string,
+): Promise<void> {
+  const db = await getDatabase();
+
+  await db.runAsync(
+    `
+      UPDATE registro_habitos
+      SET remote_id = ?, habito_local_id = ?, fecha = ?, completado = ?, observacion = ?, created_at = ?, updated_at = ?, sync_status = ?
+      WHERE local_id = ?;
+    `,
+    [
+      remoteRecord.id,
+      habitLocalId,
+      remoteRecord.fecha,
+      remoteRecord.completado ? 1 : 0,
+      remoteRecord.observacion,
+      remoteRecord.created_at,
+      remoteRecord.updated_at,
+      'synced',
+      localId,
+    ],
+  );
+}
+
+export async function upsertHabitRecordFromRemote(
+  remoteRecord: RemoteHabitRecord,
+): Promise<HabitRecord | null> {
+  const habit = await getHabitByRemoteId(remoteRecord.habito_id);
+
+  if (!habit) {
+    return null;
+  }
+
+  const existingRecord =
+    (await getHabitRecordByRemoteId(remoteRecord.id)) ??
+    (await getHabitRecordByUniqueKey(habit.local_id, remoteRecord.fecha));
+
+  if (existingRecord) {
+    await markHabitRecordAsSynced(existingRecord.local_id, remoteRecord, habit.local_id);
+
+    return {
+      ...existingRecord,
+      remote_id: remoteRecord.id,
+      habito_local_id: habit.local_id,
+      fecha: remoteRecord.fecha,
+      completado: remoteRecord.completado,
+      observacion: remoteRecord.observacion,
+      created_at: remoteRecord.created_at,
+      updated_at: remoteRecord.updated_at,
+      sync_status: 'synced',
+    };
+  }
+
+  const db = await getDatabase();
+  const localId = `remote-habit-record-${remoteRecord.id}`;
+
+  await db.runAsync(
+    `
+      INSERT INTO registro_habitos (
+        local_id, remote_id, habito_local_id, fecha, completado, observacion, created_at, updated_at, sync_status
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+    `,
+    [
+      localId,
+      remoteRecord.id,
+      habit.local_id,
+      remoteRecord.fecha,
+      remoteRecord.completado ? 1 : 0,
+      remoteRecord.observacion,
+      remoteRecord.created_at,
+      remoteRecord.updated_at,
+      'synced',
+    ],
+  );
+
+  return {
+    local_id: localId,
+    remote_id: remoteRecord.id,
+    habito_local_id: habit.local_id,
+    fecha: remoteRecord.fecha,
+    completado: remoteRecord.completado,
+    observacion: remoteRecord.observacion,
+    created_at: remoteRecord.created_at,
+    updated_at: remoteRecord.updated_at,
+    sync_status: 'synced',
+  };
+}
+
+export async function hardDeleteHabitRecord(localId: string): Promise<void> {
+  const db = await getDatabase();
+
+  await db.runAsync(
+    `
+      DELETE FROM registro_habitos
+      WHERE local_id = ?;
+    `,
+    [localId],
+  );
 }

@@ -1,3 +1,5 @@
+import type { RemoteHabit } from '@/services';
+
 import { getDatabase } from '../client';
 
 export type Habit = {
@@ -153,4 +155,91 @@ export async function listHabits(): Promise<Habit[]> {
   );
 
   return rows;
+}
+
+export async function getHabitByRemoteId(remoteId: number): Promise<Habit | null> {
+  const habits = await listHabits();
+
+  return habits.find((habit) => habit.remote_id === remoteId) ?? null;
+}
+
+export async function markHabitAsSynced(
+  localId: string,
+  remoteHabit: RemoteHabit,
+  userRemoteId: number,
+): Promise<void> {
+  const db = await getDatabase();
+
+  await db.runAsync(
+    `
+      UPDATE habitos
+      SET remote_id = ?, user_remote_id = ?, nombre = ?, created_at = ?, updated_at = ?, deleted_at = ?, sync_status = ?
+      WHERE local_id = ?;
+    `,
+    [
+      remoteHabit.id,
+      userRemoteId,
+      remoteHabit.nombre,
+      remoteHabit.created_at,
+      remoteHabit.updated_at,
+      null,
+      'synced',
+      localId,
+    ],
+  );
+}
+
+export async function upsertHabitFromRemote(
+  remoteHabit: RemoteHabit,
+  userRemoteId: number,
+): Promise<Habit> {
+  const existingHabit = await getHabitByRemoteId(remoteHabit.id);
+
+  if (existingHabit) {
+    await markHabitAsSynced(existingHabit.local_id, remoteHabit, userRemoteId);
+
+    return {
+      ...existingHabit,
+      remote_id: remoteHabit.id,
+      user_remote_id: userRemoteId,
+      nombre: remoteHabit.nombre,
+      created_at: remoteHabit.created_at,
+      updated_at: remoteHabit.updated_at,
+      deleted_at: null,
+      sync_status: 'synced',
+    };
+  }
+
+  const db = await getDatabase();
+  const localId = `remote-habit-${remoteHabit.id}`;
+
+  await db.runAsync(
+    `
+      INSERT INTO habitos (
+        local_id, remote_id, user_remote_id, nombre, created_at, updated_at, deleted_at, sync_status
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    `,
+    [
+      localId,
+      remoteHabit.id,
+      userRemoteId,
+      remoteHabit.nombre,
+      remoteHabit.created_at,
+      remoteHabit.updated_at,
+      null,
+      'synced',
+    ],
+  );
+
+  return {
+    local_id: localId,
+    remote_id: remoteHabit.id,
+    user_remote_id: userRemoteId,
+    nombre: remoteHabit.nombre,
+    created_at: remoteHabit.created_at,
+    updated_at: remoteHabit.updated_at,
+    deleted_at: null,
+    sync_status: 'synced',
+  };
 }

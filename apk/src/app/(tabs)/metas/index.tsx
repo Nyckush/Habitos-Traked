@@ -6,26 +6,20 @@ import MaterialDesignIcons from '@react-native-vector-icons/material-design-icon
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset } from '@/constants/theme';
-import { listRoutineDays, listRoutines, type Routine, type RoutineDay } from '@/database';
+import { listMetasWithEstado, type MetaWithEstado } from '@/database';
 import { useAuth } from '@/providers/auth-provider';
 import { useDatabase } from '@/providers/database-provider';
-import { pullRoutines } from '@/services/routines-sync';
+import { pullGoals } from '@/services/goals-sync';
 
-export default function RoutinesListScreen() {
-  const { isReady } = useDatabase();
+export default function MetasListScreen() {
   const { token, user } = useAuth();
-  const [routines, setRoutines] = useState<Routine[]>([]);
-  const [routineDays, setRoutineDays] = useState<RoutineDay[]>([]);
+  const { isReady } = useDatabase();
+  const [metas, setMetas] = useState<MetaWithEstado[]>([]);
 
-  const loadData = useCallback(async () => {
-    if (token && user) {
-      await pullRoutines(token, user.id);
-    }
-
-    const [routinesData, routineDaysData] = await Promise.all([listRoutines(), listRoutineDays()]);
-    setRoutines(routinesData);
-    setRoutineDays(routineDaysData);
-  }, [token, user]);
+  const loadData = async () => {
+    const metasData = await listMetasWithEstado();
+    setMetas(metasData);
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -34,11 +28,17 @@ export default function RoutinesListScreen() {
       }
 
       const timerId = setTimeout(() => {
-        void loadData();
+        void (async () => {
+          if (token && user) {
+            await pullGoals(token, user.id);
+          }
+
+          await loadData();
+        })();
       }, 0);
 
       return () => clearTimeout(timerId);
-    }, [isReady, loadData]),
+    }, [isReady, token, user]),
   );
 
   return (
@@ -48,47 +48,43 @@ export default function RoutinesListScreen() {
           <View style={styles.content}>
             <View style={styles.titleRow}>
               <View style={styles.titleIcon}>
-                <MaterialDesignIcons name="repeat" size={18} color="#FFFFFF" />
+                <MaterialDesignIcons name="trophy-outline" size={18} color="#FFFFFF" />
               </View>
 
-              <ThemedText style={styles.title}>Mis rutinas</ThemedText>
+              <ThemedText style={styles.title}>Mis metas</ThemedText>
             </View>
 
             <ThemedText themeColor="textSecondary" style={styles.subtitle}>
-              Listado de Rutinas
+              Listado de Metas
             </ThemedText>
 
-            {routines.length === 0 ? (
-              <ThemedText themeColor="textSecondary">Todavia no hay rutinas cargadas.</ThemedText>
+            {metas.length === 0 ? (
+              <ThemedText themeColor="textSecondary">Todavia no hay metas cargadas.</ThemedText>
             ) : (
-              routines.map((routine) => (
-                <View key={routine.local_id} style={styles.routineCard}>
+              metas.map((meta) => (
+                <View key={meta.local_id} style={styles.metaCard}>
                   <Pressable
                     onPress={() =>
                       router.push({
-                        pathname: '/routines/[routineId]',
-                        params: { routineId: routine.local_id },
+                        pathname: '/metas/[metaId]',
+                        params: { metaId: meta.local_id },
                       })
                     }
                     style={({ pressed }) => [pressed && styles.buttonPressed]}>
-                    <ThemedText>{routine.nombre}</ThemedText>
-                    <ThemedText themeColor="textSecondary" style={styles.daysSummary}>
-                      {routineDays
-                        .filter((item) => item.rutina_local_id === routine.local_id)
-                        .map((item) => item.dia_semana)
-                        .join(' · ')}
-                    </ThemedText>
+                    <ThemedText>{meta.nombre}</ThemedText>
+                    <ThemedText themeColor="textSecondary">{`Estado: ${meta.estado}`}</ThemedText>
+                    <ThemedText themeColor="textSecondary">{`Inicio: ${meta.fecha_inicio ?? 'Sin fecha'}`}</ThemedText>
                   </Pressable>
 
                   <Pressable
                     onPress={() =>
                       router.push({
-                        pathname: '/routines/[routineId]/organize',
-                        params: { routineId: routine.local_id },
+                        pathname: '/metas/[metaId]/plan',
+                        params: { metaId: meta.local_id },
                       })
                     }
-                    style={({ pressed }) => [styles.organizeButton, pressed && styles.buttonPressed]}>
-                    <ThemedText style={styles.organizeButtonText}>Organizar</ThemedText>
+                    style={({ pressed }) => [styles.planButton, pressed && styles.buttonPressed]}>
+                    <ThemedText style={styles.planButtonText}>Planificar</ThemedText>
                   </Pressable>
                 </View>
               ))
@@ -97,12 +93,12 @@ export default function RoutinesListScreen() {
         </View>
       </ScrollView>
 
-        <Pressable
-          onPress={() => router.push('/routines/create')}
-          style={({ pressed }) => [styles.floatingButton, pressed && styles.buttonPressed]}>
-          <MaterialDesignIcons name="plus" size={22} color="#FFFFFF" />
-          <ThemedText style={styles.floatingButtonText}>Crear Rutina</ThemedText>
-        </Pressable>
+      <Pressable
+        onPress={() => router.push('/metas/create')}
+        style={({ pressed }) => [styles.floatingButton, pressed && styles.buttonPressed]}>
+        <MaterialDesignIcons name="plus" size={22} color="#FFFFFF" />
+        <ThemedText style={styles.floatingButtonText}>Crear Meta</ThemedText>
+      </Pressable>
     </ThemedView>
   );
 }
@@ -147,7 +143,7 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     marginTop: 24,
   },
-  routineCard: {
+  metaCard: {
     borderWidth: 1,
     borderColor: '#27272A',
     borderRadius: 8,
@@ -155,10 +151,7 @@ const styles = StyleSheet.create({
     gap: 10,
     backgroundColor: '#18181B',
   },
-  daysSummary: {
-    textTransform: 'capitalize',
-  },
-  organizeButton: {
+  planButton: {
     minHeight: 40,
     borderRadius: 8,
     borderWidth: 1,
@@ -168,7 +161,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 12,
   },
-  organizeButtonText: {
+  planButtonText: {
     color: '#FFFFFF',
     fontWeight: '700',
   },

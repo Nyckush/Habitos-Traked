@@ -1,25 +1,39 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { createHabit } from '@/database';
-import { useAuth } from '@/providers/auth-provider';
-import { useDatabase } from '@/providers/database-provider';
-import { syncHabits } from '@/services/habits-sync';
+import { getMetaById } from '@/database';
 
-export default function HabitsCreateScreen() {
-  const { token, user } = useAuth();
-  const { refreshStatus } = useDatabase();
+function resolveParam(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) {
+    return value[0] ?? '';
+  }
+
+  return value ?? '';
+}
+
+export default function ObjectiveCreateNameScreen() {
+  const { metaId, objectiveId, objectiveName, selectedHabitIds, metaEsperada, fechaLimite } = useLocalSearchParams<{
+    metaId?: string | string[];
+    objectiveId?: string | string[];
+    objectiveName?: string | string[];
+    selectedHabitIds?: string | string[];
+    metaEsperada?: string | string[];
+    fechaLimite?: string | string[];
+  }>();
   const inputRef = useRef<TextInput>(null);
-  const [nombre, setNombre] = useState('');
+  const [metaNombre, setMetaNombre] = useState('');
+  const [nombre, setNombre] = useState(resolveParam(objectiveName));
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
-  const [labelAnimation] = useState(() => new Animated.Value(0));
+  const [labelAnimation] = useState(() => new Animated.Value(resolveParam(objectiveName).trim().length > 0 ? 1 : 0));
   const [underlineAnimation] = useState(() => new Animated.Value(0));
+
+  const metaLocalId = resolveParam(metaId);
+  const objectiveLocalId = resolveParam(objectiveId);
 
   useFocusEffect(
     useCallback(() => {
@@ -30,6 +44,17 @@ export default function HabitsCreateScreen() {
       return () => clearTimeout(timerId);
     }, []),
   );
+
+  useEffect(() => {
+    void (async () => {
+      if (!metaLocalId) {
+        return;
+      }
+
+      const meta = await getMetaById(metaLocalId);
+      setMetaNombre(meta?.nombre ?? '');
+    })();
+  }, [metaLocalId]);
 
   useEffect(() => {
     Animated.timing(labelAnimation, {
@@ -49,33 +74,24 @@ export default function HabitsCreateScreen() {
     }).start();
   }, [isFocused, underlineAnimation]);
 
-  async function handleCreateHabit() {
+  function handleContinue() {
     if (!nombre.trim()) {
-      setError('Escribi un nombre para el habito.');
+      setError('Escribi un nombre para el objetivo.');
       return;
     }
 
-    try {
-      setSubmitting(true);
-      setError(null);
-
-      await createHabit({
-        userRemoteId: user?.id ?? null,
-        nombre,
-      });
-
-      if (token && user) {
-        await syncHabits(token, user.id);
-      }
-
-      setNombre('');
-      await refreshStatus();
-      router.replace('/habits');
-    } catch (createError) {
-      setError(createError instanceof Error ? createError.message : 'No se pudo guardar el habito.');
-    } finally {
-      setSubmitting(false);
-    }
+    setError(null);
+    router.push({
+      pathname: '/metas/[metaId]/objectives/habits',
+      params: {
+        metaId: metaLocalId,
+        objectiveId: objectiveLocalId,
+        objectiveName: nombre.trim(),
+        selectedHabitIds: resolveParam(selectedHabitIds),
+        metaEsperada: resolveParam(metaEsperada),
+        fechaLimite: resolveParam(fechaLimite),
+      },
+    });
   }
 
   return (
@@ -84,7 +100,12 @@ export default function HabitsCreateScreen() {
         <View style={styles.content}>
           <View style={styles.headerRow}>
             <Pressable
-              onPress={() => router.replace('/habits')}
+              onPress={() =>
+                router.replace({
+                  pathname: '/metas/[metaId]/plan',
+                  params: { metaId: metaLocalId },
+                })
+              }
               hitSlop={12}
               style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}>
               <ThemedText style={styles.backButtonText}>{'<'}</ThemedText>
@@ -93,19 +114,23 @@ export default function HabitsCreateScreen() {
             <View style={styles.headerTitleBlock}>
               <View style={styles.headerTitleRow}>
                 <View style={styles.headerTitleIcon}>
-                  <MaterialDesignIcons name="fire" size={16} color="#FFFFFF" />
+                  <MaterialDesignIcons name="target" size={16} color="#FFFFFF" />
                 </View>
 
-                <ThemedText style={styles.headerTitle}>Define tu Habito</ThemedText>
+                <ThemedText style={styles.headerTitle}>{objectiveLocalId ? 'Editar Objetivo' : 'Crear Objetivo'}</ThemedText>
               </View>
 
               <ThemedText themeColor="textSecondary" style={styles.headerSubtitle}>
-                Crea un nombre simple para empezar
+                {metaNombre ? `Meta: ${metaNombre}` : 'Paso 1 de 3'}
               </ThemedText>
             </View>
 
             <View style={styles.headerSpacer} />
           </View>
+
+          <ThemedText themeColor="textSecondary" style={styles.stepText}>
+            Paso 1 de 3 · Nombre del objetivo
+          </ThemedText>
 
           <View style={styles.formCard}>
             <View style={styles.inputGroup}>
@@ -131,7 +156,7 @@ export default function HabitsCreateScreen() {
                     ],
                   },
                 ]}>
-                Habito
+                Objetivo
               </Animated.Text>
 
               <TextInput
@@ -164,13 +189,8 @@ export default function HabitsCreateScreen() {
 
             {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
 
-            <Pressable
-              disabled={submitting}
-              onPress={handleCreateHabit}
-              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, submitting && styles.buttonDisabled]}>
-              <ThemedText style={styles.buttonText}>
-                {submitting ? 'Guardando...' : 'Guardar habito'}
-              </ThemedText>
+            <Pressable onPress={handleContinue} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
+              <ThemedText style={styles.buttonText}>Continuar</ThemedText>
             </Pressable>
           </View>
         </View>
@@ -227,6 +247,9 @@ const styles = StyleSheet.create({
   headerSpacer: {
     width: 32,
   },
+  stepText: {
+    marginTop: 24,
+  },
   formCard: {
     gap: 16,
     borderWidth: 1,
@@ -274,9 +297,6 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     opacity: 0.85,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
   },
   buttonText: {
     color: '#FFFFFF',

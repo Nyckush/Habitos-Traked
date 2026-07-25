@@ -1,57 +1,73 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { createHabit } from '@/database';
 import { useAuth } from '@/providers/auth-provider';
-import { useDatabase } from '@/providers/database-provider';
-import { syncHabits } from '@/services/habits-sync';
 
-export default function HabitsCreateScreen() {
-  const { token, user } = useAuth();
-  const { refreshStatus } = useDatabase();
-  const inputRef = useRef<TextInput>(null);
-  const [nombre, setNombre] = useState('');
+export default function ProfileEditScreen() {
+  const { user, updateProfile } = useAuth();
+  const usernameInputRef = useRef<TextInput>(null);
+  const [username, setUsername] = useState(user?.username ?? '');
+  const [perfil, setPerfil] = useState(user?.perfil ?? '');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
-  const [labelAnimation] = useState(() => new Animated.Value(0));
-  const [underlineAnimation] = useState(() => new Animated.Value(0));
-
-  useFocusEffect(
-    useCallback(() => {
-      const timerId = setTimeout(() => {
-        inputRef.current?.focus();
-      }, 50);
-
-      return () => clearTimeout(timerId);
-    }, []),
-  );
+  const [usernameFocused, setUsernameFocused] = useState(false);
+  const [perfilFocused, setPerfilFocused] = useState(false);
+  const [usernameLabelAnimation] = useState(() => new Animated.Value((user?.username ?? '').trim().length > 0 ? 1 : 0));
+  const [perfilLabelAnimation] = useState(() => new Animated.Value((user?.perfil ?? '').trim().length > 0 ? 1 : 0));
+  const [usernameUnderlineAnimation] = useState(() => new Animated.Value(0));
+  const [perfilUnderlineAnimation] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
-    Animated.timing(labelAnimation, {
-      toValue: isFocused || nombre.trim().length > 0 ? 1 : 0,
+    const timerId = setTimeout(() => {
+      usernameInputRef.current?.focus();
+    }, 50);
+
+    return () => clearTimeout(timerId);
+  }, []);
+
+  useEffect(() => {
+    Animated.timing(usernameLabelAnimation, {
+      toValue: usernameFocused || username.trim().length > 0 ? 1 : 0,
       duration: 180,
       easing: Easing.out(Easing.ease),
       useNativeDriver: true,
     }).start();
-  }, [isFocused, labelAnimation, nombre]);
+  }, [username, usernameFocused, usernameLabelAnimation]);
 
   useEffect(() => {
-    Animated.timing(underlineAnimation, {
-      toValue: isFocused ? 1 : 0,
+    Animated.timing(perfilLabelAnimation, {
+      toValue: perfilFocused || perfil.trim().length > 0 ? 1 : 0,
       duration: 180,
       easing: Easing.out(Easing.ease),
       useNativeDriver: true,
     }).start();
-  }, [isFocused, underlineAnimation]);
+  }, [perfil, perfilFocused, perfilLabelAnimation]);
 
-  async function handleCreateHabit() {
-    if (!nombre.trim()) {
-      setError('Escribi un nombre para el habito.');
+  useEffect(() => {
+    Animated.timing(usernameUnderlineAnimation, {
+      toValue: usernameFocused ? 1 : 0,
+      duration: 180,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  }, [usernameFocused, usernameUnderlineAnimation]);
+
+  useEffect(() => {
+    Animated.timing(perfilUnderlineAnimation, {
+      toValue: perfilFocused ? 1 : 0,
+      duration: 180,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  }, [perfilFocused, perfilUnderlineAnimation]);
+
+  async function handleSaveProfile() {
+    if (!username.trim()) {
+      setError('Escribi un username.');
       return;
     }
 
@@ -59,20 +75,14 @@ export default function HabitsCreateScreen() {
       setSubmitting(true);
       setError(null);
 
-      await createHabit({
-        userRemoteId: user?.id ?? null,
-        nombre,
+      await updateProfile({
+        username,
+        perfil: perfil.trim() || null,
       });
 
-      if (token && user) {
-        await syncHabits(token, user.id);
-      }
-
-      setNombre('');
-      await refreshStatus();
-      router.replace('/habits');
-    } catch (createError) {
-      setError(createError instanceof Error ? createError.message : 'No se pudo guardar el habito.');
+      router.replace('/profile');
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'No se pudo actualizar el perfil.');
     } finally {
       setSubmitting(false);
     }
@@ -84,7 +94,7 @@ export default function HabitsCreateScreen() {
         <View style={styles.content}>
           <View style={styles.headerRow}>
             <Pressable
-              onPress={() => router.replace('/habits')}
+              onPress={() => router.replace('/profile')}
               hitSlop={12}
               style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}>
               <ThemedText style={styles.backButtonText}>{'<'}</ThemedText>
@@ -93,14 +103,14 @@ export default function HabitsCreateScreen() {
             <View style={styles.headerTitleBlock}>
               <View style={styles.headerTitleRow}>
                 <View style={styles.headerTitleIcon}>
-                  <MaterialDesignIcons name="fire" size={16} color="#FFFFFF" />
+                  <MaterialDesignIcons name="account-edit-outline" size={16} color="#FFFFFF" />
                 </View>
 
-                <ThemedText style={styles.headerTitle}>Define tu Habito</ThemedText>
+                <ThemedText style={styles.headerTitle}>Editar Perfil</ThemedText>
               </View>
 
               <ThemedText themeColor="textSecondary" style={styles.headerSubtitle}>
-                Crea un nombre simple para empezar
+                Modifica username y foto de perfil
               </ThemedText>
             </View>
 
@@ -114,16 +124,16 @@ export default function HabitsCreateScreen() {
                 style={[
                   styles.floatingLabel,
                   {
-                    color: isFocused || nombre.trim().length > 0 ? '#E4E4E7' : '#A1A1AA',
+                    color: usernameFocused || username.trim().length > 0 ? '#E4E4E7' : '#A1A1AA',
                     transform: [
                       {
-                        translateY: labelAnimation.interpolate({
+                        translateY: usernameLabelAnimation.interpolate({
                           inputRange: [0, 1],
                           outputRange: [20, 2],
                         }),
                       },
                       {
-                        scale: labelAnimation.interpolate({
+                        scale: usernameLabelAnimation.interpolate({
                           inputRange: [0, 1],
                           outputRange: [1, 0.78],
                         }),
@@ -131,16 +141,16 @@ export default function HabitsCreateScreen() {
                     ],
                   },
                 ]}>
-                Habito
+                Username
               </Animated.Text>
 
               <TextInput
-                ref={inputRef}
+                ref={usernameInputRef}
                 style={styles.input}
-                value={nombre}
-                onChangeText={setNombre}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
+                value={username}
+                onChangeText={setUsername}
+                onFocus={() => setUsernameFocused(true)}
+                onBlur={() => setUsernameFocused(false)}
               />
 
               <View style={styles.inputLineBase} />
@@ -148,10 +158,65 @@ export default function HabitsCreateScreen() {
                 style={[
                   styles.inputLineActive,
                   {
-                    opacity: underlineAnimation,
+                    opacity: usernameUnderlineAnimation,
                     transform: [
                       {
-                        scaleX: underlineAnimation.interpolate({
+                        scaleX: usernameUnderlineAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.35, 1],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Animated.Text
+                pointerEvents="none"
+                style={[
+                  styles.floatingLabel,
+                  {
+                    color: perfilFocused || perfil.trim().length > 0 ? '#E4E4E7' : '#A1A1AA',
+                    transform: [
+                      {
+                        translateY: perfilLabelAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [20, 2],
+                        }),
+                      },
+                      {
+                        scale: perfilLabelAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [1, 0.78],
+                        }),
+                      },
+                    ],
+                  },
+                ]}>
+                Foto de perfil URL
+              </Animated.Text>
+
+              <TextInput
+                style={styles.input}
+                value={perfil}
+                onChangeText={setPerfil}
+                onFocus={() => setPerfilFocused(true)}
+                onBlur={() => setPerfilFocused(false)}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+
+              <View style={styles.inputLineBase} />
+              <Animated.View
+                style={[
+                  styles.inputLineActive,
+                  {
+                    opacity: perfilUnderlineAnimation,
+                    transform: [
+                      {
+                        scaleX: perfilUnderlineAnimation.interpolate({
                           inputRange: [0, 1],
                           outputRange: [0.35, 1],
                         }),
@@ -166,11 +231,9 @@ export default function HabitsCreateScreen() {
 
             <Pressable
               disabled={submitting}
-              onPress={handleCreateHabit}
+              onPress={handleSaveProfile}
               style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, submitting && styles.buttonDisabled]}>
-              <ThemedText style={styles.buttonText}>
-                {submitting ? 'Guardando...' : 'Guardar habito'}
-              </ThemedText>
+              <ThemedText style={styles.buttonText}>{submitting ? 'Guardando...' : 'Guardar cambios'}</ThemedText>
             </Pressable>
           </View>
         </View>
@@ -228,6 +291,7 @@ const styles = StyleSheet.create({
     width: 32,
   },
   formCard: {
+    marginTop: 24,
     gap: 16,
     borderWidth: 1,
     borderColor: '#27272A',

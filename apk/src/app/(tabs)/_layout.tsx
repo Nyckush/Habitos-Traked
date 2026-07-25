@@ -1,12 +1,18 @@
 import { Tabs } from 'expo-router';
 import { StyleSheet, View, useColorScheme } from 'react-native';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors } from '@/constants/theme';
+import { useAuth } from '@/providers/auth-provider';
 
 export default function AppTabsLayout() {
   const scheme = useColorScheme();
   const theme = Colors[scheme === 'dark' ? 'dark' : 'light'];
+  const insets = useSafeAreaInsets();
+  const { token, user } = useAuth();
+  const bottomInset = Math.max(insets.bottom, 10);
+  const navigationSessionKey = token && user ? `auth-${user.id}` : 'guest';
 
   function renderTabIcon(
     focused: boolean,
@@ -32,6 +38,7 @@ export default function AppTabsLayout() {
 
   return (
     <Tabs
+      key={navigationSessionKey}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.text,
@@ -40,14 +47,14 @@ export default function AppTabsLayout() {
           backgroundColor: theme.background,
           borderTopColor: '#27272A',
           borderTopWidth: 1,
-          height: 72,
+          height: 72 + bottomInset,
           paddingTop: 8,
-          paddingBottom: 10,
+          paddingBottom: bottomInset,
           paddingHorizontal: 8,
           position: 'absolute',
           left: 12,
           right: 12,
-          bottom: 12,
+          bottom: bottomInset,
           borderRadius: 18,
           shadowColor: '#000000',
           shadowOpacity: 0.35,
@@ -133,11 +140,73 @@ export default function AppTabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="goals"
+        name="metas"
         options={{
           title: 'Metas',
           tabBarIcon: ({ color, size, focused }) =>
             renderTabIcon(focused, color, size, 'trophy', 'trophy-outline'),
+        }}
+      />
+      <Tabs.Screen
+        name="metas/create"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="metas/[metaId]"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="metas/[metaId]/plan"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="metas/[metaId]/objectives/create"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="metas/[metaId]/objectives/habits"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="metas/[metaId]/objectives/details"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Perfil',
+          tabBarIcon: ({ color, size, focused }) =>
+            renderTabIcon(focused, color, size, 'account-circle', 'account-circle-outline'),
+        }}
+      />
+      <Tabs.Screen
+        name="profile/edit"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="profile/notifications"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="tasks/create"
+        options={{
+          href: null,
         }}
       />
     </Tabs>

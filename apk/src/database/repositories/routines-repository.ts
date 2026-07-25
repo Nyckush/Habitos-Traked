@@ -1,4 +1,7 @@
+import type { RemoteRoutine } from '@/services';
+
 import { getDatabase } from '../client';
+import { createRoutineDay, deleteRoutineDaysByRoutineId } from './routine-days-repository';
 
 export type Routine = {
   local_id: string;
@@ -150,4 +153,107 @@ export async function listRoutines(): Promise<Routine[]> {
   );
 
   return rows;
+}
+
+export async function getRoutineByRemoteId(remoteId: number): Promise<Routine | null> {
+  const routines = await listRoutines();
+
+  return routines.find((routine) => routine.remote_id === remoteId) ?? null;
+}
+
+export async function markRoutineAsSynced(
+  localId: string,
+  remoteRoutine: RemoteRoutine,
+  userRemoteId: number,
+): Promise<void> {
+  const db = await getDatabase();
+
+  await db.runAsync(
+    `
+      UPDATE rutinas
+      SET remote_id = ?, user_remote_id = ?, nombre = ?, created_at = ?, updated_at = ?, deleted_at = ?, sync_status = ?
+      WHERE local_id = ?;
+    `,
+    [
+      remoteRoutine.id,
+      userRemoteId,
+      remoteRoutine.nombre,
+      remoteRoutine.created_at,
+      remoteRoutine.updated_at,
+      null,
+      'synced',
+      localId,
+    ],
+  );
+
+  await deleteRoutineDaysByRoutineId(localId);
+
+  for (const day of remoteRoutine.dias) {
+    await createRoutineDay({
+      rutinaLocalId: localId,
+      diaSemana: day,
+    });
+  }
+}
+
+export async function upsertRoutineFromRemote(
+  remoteRoutine: RemoteRoutine,
+  userRemoteId: number,
+): Promise<Routine> {
+  const existingRoutine = await getRoutineByRemoteId(remoteRoutine.id);
+
+  if (existingRoutine) {
+    await markRoutineAsSynced(existingRoutine.local_id, remoteRoutine, userRemoteId);
+
+    return {
+      ...existingRoutine,
+      remote_id: remoteRoutine.id,
+      user_remote_id: userRemoteId,
+      nombre: remoteRoutine.nombre,
+      created_at: remoteRoutine.created_at,
+      updated_at: remoteRoutine.updated_at,
+      deleted_at: null,
+      sync_status: 'synced',
+    };
+  }
+
+  const db = await getDatabase();
+  const localId = `remote-routine-${remoteRoutine.id}`;
+
+  await db.runAsync(
+    `
+      INSERT INTO rutinas (
+        local_id, remote_id, user_remote_id, nombre, created_at, updated_at, deleted_at, sync_status
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    `,
+    [
+      localId,
+      remoteRoutine.id,
+      userRemoteId,
+      remoteRoutine.nombre,
+      remoteRoutine.created_at,
+      remoteRoutine.updated_at,
+      null,
+      'synced',
+    ],
+  );
+
+  for (const day of remoteRoutine.dias) {
+    await createRoutineDay({
+      rutinaLocalId: localId,
+      diaSemana: day,
+    });
+  }
+
+  return {
+    local_id: localId,
+    remote_id: remoteRoutine.id,
+    user_remote_id: userRemoteId,
+    nombre: remoteRoutine.nombre,
+    created_at: remoteRoutine.created_at,
+    updated_at: remoteRoutine.updated_at,
+    deleted_at: null,
+    sync_status: 'synced',
+  };
 }

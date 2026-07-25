@@ -9,7 +9,8 @@ export type AppDatabase = {
 type UserRow = {
   local_id: string;
   remote_id: number | null;
-  nombre: string;
+  username: string;
+  perfil: string | null;
   email: string;
   created_at: string | null;
   updated_at: string | null;
@@ -25,8 +26,10 @@ type WebDatabaseState = {
   rutinaDias: Record<string, RutinaDiaRow>;
   registroHabitos: Record<string, RegistroHabitoRow>;
   actividadHabitos: Record<string, ActividadHabitoRow>;
+  tareas: Record<string, TareaRow>;
   metas: Record<string, MetaRow>;
   objetivos: Record<string, ObjetivoRow>;
+  objetivoHabitos: Record<string, ObjetivoHabitoRow>;
   syncQueueCount: number;
 };
 
@@ -91,6 +94,20 @@ type ActividadHabitoRow = {
   sync_status: string;
 };
 
+type TareaRow = {
+  local_id: string;
+  remote_id: number | null;
+  user_remote_id: number | null;
+  titulo: string;
+  hora_inicio: string | null;
+  estado: 'pendiente' | 'completada';
+  completed_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  deleted_at: string | null;
+  sync_status: string;
+};
+
 type MetaRow = {
   local_id: string;
   remote_id: number | null;
@@ -107,10 +124,19 @@ type ObjetivoRow = {
   remote_id: number | null;
   user_remote_id: number | null;
   meta_local_id: string | null;
-  habito_local_id: string;
   nombre: string;
   meta_esperada: number;
   fecha_limite: string;
+  created_at: string | null;
+  updated_at: string | null;
+  sync_status: string;
+};
+
+type ObjetivoHabitoRow = {
+  local_id: string;
+  remote_id: number | null;
+  objetivo_local_id: string;
+  habito_local_id: string;
   created_at: string | null;
   updated_at: string | null;
   sync_status: string;
@@ -120,17 +146,34 @@ const STORAGE_KEY = 'habitracked.web.db';
 
 function loadState(): WebDatabaseState {
   if (typeof window === 'undefined') {
-    return { app_meta: {}, users: {}, habitos: {}, rutinas: {}, rutinaHabitos: {}, rutinaDias: {}, registroHabitos: {}, actividadHabitos: {}, metas: {}, objetivos: {}, syncQueueCount: 0 };
+    return { app_meta: {}, users: {}, habitos: {}, rutinas: {}, rutinaHabitos: {}, rutinaDias: {}, registroHabitos: {}, actividadHabitos: {}, tareas: {}, metas: {}, objetivos: {}, objetivoHabitos: {}, syncQueueCount: 0 };
   }
 
   const raw = window.localStorage.getItem(STORAGE_KEY);
 
   if (!raw) {
-    return { app_meta: {}, users: {}, habitos: {}, rutinas: {}, rutinaHabitos: {}, rutinaDias: {}, registroHabitos: {}, actividadHabitos: {}, metas: {}, objetivos: {}, syncQueueCount: 0 };
+    return { app_meta: {}, users: {}, habitos: {}, rutinas: {}, rutinaHabitos: {}, rutinaDias: {}, registroHabitos: {}, actividadHabitos: {}, tareas: {}, metas: {}, objetivos: {}, objetivoHabitos: {}, syncQueueCount: 0 };
   }
 
   try {
     const parsed = JSON.parse(raw) as Partial<WebDatabaseState>;
+    const users = Object.fromEntries(
+      Object.entries((parsed as Partial<WebDatabaseState> & { users?: Record<string, UserRow & { nombre?: string; perfil?: string | null }> }).users ?? {}).map(
+        ([key, value]) => [
+          key,
+          {
+            local_id: value.local_id,
+            remote_id: value.remote_id,
+            username: value.username ?? value.nombre ?? '',
+            perfil: value.perfil ?? null,
+            email: value.email,
+            created_at: value.created_at ?? null,
+            updated_at: value.updated_at ?? null,
+            sync_status: value.sync_status,
+          } satisfies UserRow,
+        ],
+      ),
+    );
     const habitos = Object.fromEntries(
       Object.entries(parsed.habitos ?? {}).map(([key, value]) => {
         const legacyHabit = value as HabitoRow & { titulo?: string };
@@ -156,21 +199,70 @@ function loadState(): WebDatabaseState {
       ),
     );
 
+    const objetivos = Object.fromEntries(
+      Object.entries(parsed.objetivos ?? {}).map(([key, value]) => {
+        const legacyObjetivo = value as ObjetivoRow & { habito_local_id?: string };
+
+        return [
+          key,
+          {
+            local_id: legacyObjetivo.local_id,
+            remote_id: legacyObjetivo.remote_id,
+            user_remote_id: legacyObjetivo.user_remote_id,
+            meta_local_id: legacyObjetivo.meta_local_id ?? null,
+            nombre: legacyObjetivo.nombre,
+            meta_esperada: legacyObjetivo.meta_esperada,
+            fecha_limite: legacyObjetivo.fecha_limite,
+            created_at: legacyObjetivo.created_at ?? null,
+            updated_at: legacyObjetivo.updated_at ?? null,
+            sync_status: legacyObjetivo.sync_status,
+          } satisfies ObjetivoRow,
+        ];
+      }),
+    );
+    const objetivoHabitos = Object.fromEntries(
+      Object.entries((parsed as Partial<WebDatabaseState> & { objetivoHabitos?: Record<string, ObjetivoHabitoRow> }).objetivoHabitos ?? {}).map(
+        ([key, value]) => [key, value satisfies ObjetivoHabitoRow],
+      ),
+    );
+
+    for (const legacyObjetivo of Object.values(parsed.objetivos ?? {}) as (ObjetivoRow & { habito_local_id?: string })[]) {
+      if (!legacyObjetivo.habito_local_id) {
+        continue;
+      }
+
+      const pivotLocalId = `objetivo-habito-${legacyObjetivo.local_id}-${legacyObjetivo.habito_local_id}`;
+
+      if (!objetivoHabitos[pivotLocalId]) {
+        objetivoHabitos[pivotLocalId] = {
+          local_id: pivotLocalId,
+          remote_id: null,
+          objetivo_local_id: legacyObjetivo.local_id,
+          habito_local_id: legacyObjetivo.habito_local_id,
+          created_at: legacyObjetivo.created_at ?? null,
+          updated_at: legacyObjetivo.updated_at ?? null,
+          sync_status: legacyObjetivo.sync_status === 'synced' ? 'synced' : 'pending_create',
+        };
+      }
+    }
+
     return {
       app_meta: parsed.app_meta ?? {},
-      users: parsed.users ?? {},
+      users,
       habitos,
       rutinas: parsed.rutinas ?? {},
       rutinaHabitos: parsed.rutinaHabitos ?? {},
       rutinaDias: parsed.rutinaDias ?? {},
       registroHabitos: parsed.registroHabitos ?? {},
       actividadHabitos: parsed.actividadHabitos ?? {},
+      tareas: parsed.tareas ?? {},
       metas,
-      objetivos: parsed.objetivos ?? {},
+      objetivos,
+      objetivoHabitos,
       syncQueueCount: parsed.syncQueueCount ?? 0,
     };
   } catch {
-    return { app_meta: {}, users: {}, habitos: {}, rutinas: {}, rutinaHabitos: {}, rutinaDias: {}, registroHabitos: {}, actividadHabitos: {}, metas: {}, objetivos: {}, syncQueueCount: 0 };
+    return { app_meta: {}, users: {}, habitos: {}, rutinas: {}, rutinaHabitos: {}, rutinaDias: {}, registroHabitos: {}, actividadHabitos: {}, tareas: {}, metas: {}, objetivos: {}, objetivoHabitos: {}, syncQueueCount: 0 };
   }
 }
 
@@ -188,10 +280,11 @@ const webDatabase: AppDatabase = {
     const state = loadState();
 
     if (normalizedSql.startsWith('INSERT INTO USERS')) {
-      const [localId, remoteId, nombre, email, createdAt, updatedAt] = params as [
+      const [localId, remoteId, username, perfil, email, createdAt, updatedAt] = params as [
         string,
         number | null,
         string,
+        string | null,
         string,
         string | null,
         string | null,
@@ -200,7 +293,8 @@ const webDatabase: AppDatabase = {
       state.users[localId] = {
         local_id: localId,
         remote_id: remoteId,
-        nombre,
+        username,
+        perfil,
         email,
         created_at: createdAt,
         updated_at: updatedAt,
@@ -208,6 +302,31 @@ const webDatabase: AppDatabase = {
       };
 
       saveState(state);
+      return;
+    }
+
+    if (normalizedSql.startsWith('UPDATE USERS')) {
+      const [username, perfil, updatedAt, localId] = params as [
+        string,
+        string | null,
+        string | null,
+        string,
+      ];
+
+      const existingUser = state.users[localId];
+
+      if (existingUser) {
+        state.users[localId] = {
+          ...existingUser,
+          username,
+          perfil,
+          updated_at: updatedAt,
+          sync_status: 'synced',
+        };
+
+        saveState(state);
+      }
+
       return;
     }
 
@@ -247,6 +366,89 @@ const webDatabase: AppDatabase = {
       return;
     }
 
+    if (normalizedSql.startsWith('UPDATE HABITOS')) {
+      if (normalizedSql.includes('SET REMOTE_ID =')) {
+        const [remoteId, userRemoteId, nombre, createdAt, updatedAt, deletedAt, syncStatus, localId] =
+          params as [
+            number | null,
+            number | null,
+            string,
+            string | null,
+            string | null,
+            string | null,
+            string,
+            string,
+          ];
+
+        const existingHabit = state.habitos[localId];
+
+        if (existingHabit) {
+          state.habitos[localId] = {
+            ...existingHabit,
+            remote_id: remoteId,
+            user_remote_id: userRemoteId,
+            nombre,
+            created_at: createdAt,
+            updated_at: updatedAt,
+            deleted_at: deletedAt,
+            sync_status: syncStatus,
+          };
+
+          saveState(state);
+        }
+
+        return;
+      }
+
+      if (normalizedSql.includes('SET NOMBRE =')) {
+        const [nombre, updatedAt, syncStatus, localId] = params as [
+          string,
+          string | null,
+          string,
+          string,
+        ];
+
+        const existingHabit = state.habitos[localId];
+
+        if (existingHabit) {
+          state.habitos[localId] = {
+            ...existingHabit,
+            nombre,
+            updated_at: updatedAt,
+            sync_status: syncStatus,
+          };
+
+          saveState(state);
+        }
+
+        return;
+      }
+
+      if (normalizedSql.includes('SET DELETED_AT =')) {
+        const [deletedAt, updatedAt, syncStatus, localId] = params as [
+          string | null,
+          string | null,
+          string,
+          string,
+        ];
+
+        const existingHabit = state.habitos[localId];
+
+        if (existingHabit) {
+          state.habitos[localId] = {
+            ...existingHabit,
+            deleted_at: deletedAt,
+            updated_at: updatedAt,
+            sync_status: syncStatus,
+          };
+
+          saveState(state);
+        }
+
+        return;
+      }
+    }
+
     if (normalizedSql.startsWith('INSERT INTO RUTINAS')) {
       const [localId, remoteId, userRemoteId, nombre, createdAt, updatedAt, deletedAt, syncStatus] = params as [
         string,
@@ -274,6 +476,89 @@ const webDatabase: AppDatabase = {
       return;
     }
 
+    if (normalizedSql.startsWith('UPDATE RUTINAS')) {
+      if (normalizedSql.includes('SET REMOTE_ID =')) {
+        const [remoteId, userRemoteId, nombre, createdAt, updatedAt, deletedAt, syncStatus, localId] =
+          params as [
+            number | null,
+            number | null,
+            string,
+            string | null,
+            string | null,
+            string | null,
+            string,
+            string,
+          ];
+
+        const existingRoutine = state.rutinas[localId];
+
+        if (existingRoutine) {
+          state.rutinas[localId] = {
+            ...existingRoutine,
+            remote_id: remoteId,
+            user_remote_id: userRemoteId,
+            nombre,
+            created_at: createdAt,
+            updated_at: updatedAt,
+            deleted_at: deletedAt,
+            sync_status: syncStatus,
+          };
+
+          saveState(state);
+        }
+
+        return;
+      }
+
+      if (normalizedSql.includes('SET NOMBRE =')) {
+        const [nombre, updatedAt, syncStatus, localId] = params as [
+          string,
+          string | null,
+          string,
+          string,
+        ];
+
+        const existingRoutine = state.rutinas[localId];
+
+        if (existingRoutine) {
+          state.rutinas[localId] = {
+            ...existingRoutine,
+            nombre,
+            updated_at: updatedAt,
+            sync_status: syncStatus,
+          };
+
+          saveState(state);
+        }
+
+        return;
+      }
+
+      if (normalizedSql.includes('SET DELETED_AT =')) {
+        const [deletedAt, updatedAt, syncStatus, localId] = params as [
+          string | null,
+          string | null,
+          string,
+          string,
+        ];
+
+        const existingRoutine = state.rutinas[localId];
+
+        if (existingRoutine) {
+          state.rutinas[localId] = {
+            ...existingRoutine,
+            deleted_at: deletedAt,
+            updated_at: updatedAt,
+            sync_status: syncStatus,
+          };
+
+          saveState(state);
+        }
+
+        return;
+      }
+    }
+
     if (normalizedSql.startsWith('INSERT INTO RUTINA_HABITOS')) {
       const [localId, remoteId, rutinaLocalId, habitoLocalId, horaInicio, syncStatus] = params as [
         string,
@@ -297,6 +582,57 @@ const webDatabase: AppDatabase = {
       return;
     }
 
+    if (normalizedSql.startsWith('UPDATE RUTINA_HABITOS')) {
+      if (normalizedSql.includes('SET REMOTE_ID =')) {
+        const [remoteId, rutinaLocalId, habitoLocalId, horaInicio, syncStatus, localId] =
+          params as [
+            number | null,
+            string,
+            string,
+            string | null,
+            string,
+            string,
+          ];
+
+        const existingLink = state.rutinaHabitos[localId];
+
+        if (existingLink) {
+          state.rutinaHabitos[localId] = {
+            ...existingLink,
+            remote_id: remoteId,
+            rutina_local_id: rutinaLocalId,
+            habito_local_id: habitoLocalId,
+            hora_inicio: horaInicio,
+            sync_status: syncStatus,
+          };
+
+          saveState(state);
+        }
+
+        return;
+      }
+
+      const [horaInicio, syncStatus, localId] = params as [
+        string | null,
+        string,
+        string,
+      ];
+
+      const existingLink = state.rutinaHabitos[localId];
+
+      if (existingLink) {
+        state.rutinaHabitos[localId] = {
+          ...existingLink,
+          hora_inicio: horaInicio,
+          sync_status: syncStatus,
+        };
+
+        saveState(state);
+      }
+
+      return;
+    }
+
     if (normalizedSql.startsWith('INSERT INTO RUTINA_DIAS')) {
       const [localId, remoteId, rutinaLocalId, diaSemana, syncStatus] = params as [
         string,
@@ -314,6 +650,26 @@ const webDatabase: AppDatabase = {
         sync_status: syncStatus,
       };
 
+      saveState(state);
+      return;
+    }
+
+    if (normalizedSql.startsWith('DELETE FROM RUTINA_DIAS')) {
+      const [rutinaLocalId] = params as [string];
+
+      for (const [localId, day] of Object.entries(state.rutinaDias)) {
+        if (day.rutina_local_id === rutinaLocalId) {
+          delete state.rutinaDias[localId];
+        }
+      }
+
+      saveState(state);
+      return;
+    }
+
+    if (normalizedSql.startsWith('DELETE FROM RUTINA_HABITOS')) {
+      const [localId] = params as [string];
+      delete state.rutinaHabitos[localId];
       saveState(state);
       return;
     }
@@ -364,6 +720,50 @@ const webDatabase: AppDatabase = {
     }
 
     if (normalizedSql.startsWith('UPDATE REGISTRO_HABITOS')) {
+      if (normalizedSql.includes('SET REMOTE_ID =')) {
+        const [
+          remoteId,
+          habitoLocalId,
+          fecha,
+          completado,
+          observacion,
+          createdAt,
+          updatedAt,
+          syncStatus,
+          localId,
+        ] = params as [
+          number | null,
+          string,
+          string,
+          0 | 1,
+          string | null,
+          string | null,
+          string | null,
+          string,
+          string,
+        ];
+
+        const existingEntry = state.registroHabitos[localId];
+
+        if (existingEntry) {
+          state.registroHabitos[localId] = {
+            ...existingEntry,
+            remote_id: remoteId,
+            habito_local_id: habitoLocalId,
+            fecha,
+            completado,
+            observacion,
+            created_at: createdAt,
+            updated_at: updatedAt,
+            sync_status: syncStatus,
+          };
+
+          saveState(state);
+        }
+
+        return;
+      }
+
       const [completado, observacion, updatedAt, syncStatus, localId] = params as [
         0 | 1,
         string | null,
@@ -389,6 +789,13 @@ const webDatabase: AppDatabase = {
       return;
     }
 
+    if (normalizedSql.startsWith('DELETE FROM REGISTRO_HABITOS')) {
+      const [localId] = params as [string];
+      delete state.registroHabitos[localId];
+      saveState(state);
+      return;
+    }
+
     if (normalizedSql.startsWith('INSERT INTO ACTIVIDAD_HABITOS')) {
       const [localId, remoteId, habitoLocalId, nombre, createdAt, updatedAt, syncStatus] = params as [
         string,
@@ -410,6 +817,158 @@ const webDatabase: AppDatabase = {
         sync_status: syncStatus,
       };
 
+      saveState(state);
+      return;
+    }
+
+    if (normalizedSql.startsWith('INSERT INTO TAREAS')) {
+      const [
+        localId,
+        remoteId,
+        userRemoteId,
+        titulo,
+        horaInicio,
+        estado,
+        completedAt,
+        createdAt,
+        updatedAt,
+        deletedAt,
+        syncStatus,
+      ] = params as [
+        string,
+        number | null,
+        number | null,
+        string,
+        string | null,
+        'pendiente' | 'completada',
+        string | null,
+        string | null,
+        string | null,
+        string | null,
+        string,
+      ];
+
+      state.tareas[localId] = {
+        local_id: localId,
+        remote_id: remoteId,
+        user_remote_id: userRemoteId,
+        titulo,
+        hora_inicio: horaInicio,
+        estado,
+        completed_at: completedAt,
+        created_at: createdAt,
+        updated_at: updatedAt,
+        deleted_at: deletedAt,
+        sync_status: syncStatus,
+      };
+
+      saveState(state);
+      return;
+    }
+
+    if (normalizedSql.startsWith('UPDATE TAREAS')) {
+      if (normalizedSql.includes('SET REMOTE_ID =')) {
+        const [
+          remoteId,
+          userRemoteId,
+          titulo,
+          horaInicio,
+          estado,
+          completedAt,
+          createdAt,
+          updatedAt,
+          deletedAt,
+          syncStatus,
+          localId,
+        ] = params as [
+          number | null,
+          number | null,
+          string,
+          string | null,
+          'pendiente' | 'completada',
+          string | null,
+          string | null,
+          string | null,
+          string | null,
+          string,
+          string,
+        ];
+
+        const existingTask = state.tareas[localId];
+
+        if (existingTask) {
+          state.tareas[localId] = {
+            ...existingTask,
+            remote_id: remoteId,
+            user_remote_id: userRemoteId,
+            titulo,
+            hora_inicio: horaInicio,
+            estado,
+            completed_at: completedAt,
+            created_at: createdAt,
+            updated_at: updatedAt,
+            deleted_at: deletedAt,
+            sync_status: syncStatus,
+          };
+
+          saveState(state);
+        }
+
+        return;
+      }
+
+      if (normalizedSql.includes('SET DELETED_AT =')) {
+        const [deletedAt, updatedAt, syncStatus, localId] = params as [
+          string | null,
+          string | null,
+          string,
+          string,
+        ];
+
+        const existingTask = state.tareas[localId];
+
+        if (existingTask) {
+          state.tareas[localId] = {
+            ...existingTask,
+            deleted_at: deletedAt,
+            updated_at: updatedAt,
+            sync_status: syncStatus,
+          };
+
+          saveState(state);
+        }
+
+        return;
+      }
+
+      const [estado, completedAt, updatedAt, syncStatus, localId] = params as [
+        'pendiente' | 'completada',
+        string | null,
+        string | null,
+        string,
+        string,
+      ];
+
+      const existingTask = state.tareas[localId];
+
+      if (existingTask) {
+        state.tareas[localId] = {
+          ...existingTask,
+          estado,
+          completed_at: completedAt,
+          updated_at: updatedAt,
+          sync_status: syncStatus,
+        };
+
+        saveState(state);
+      }
+
+      return;
+    }
+
+    if (normalizedSql.startsWith('DELETE FROM TAREAS')) {
+      const [localId] = params as [string];
+      delete state.tareas[localId];
       saveState(state);
       return;
     }
@@ -441,13 +1000,69 @@ const webDatabase: AppDatabase = {
       return;
     }
 
+    if (normalizedSql.startsWith('UPDATE METAS')) {
+      if (normalizedSql.includes('SET REMOTE_ID =')) {
+        const [remoteId, userRemoteId, nombre, fechaInicio, createdAt, updatedAt, syncStatus, localId] =
+          params as [
+            number | null,
+            number | null,
+            string,
+            string | null,
+            string | null,
+            string | null,
+            string,
+            string,
+          ];
+
+        const existingMeta = state.metas[localId];
+
+        if (existingMeta) {
+          state.metas[localId] = {
+            ...existingMeta,
+            remote_id: remoteId,
+            user_remote_id: userRemoteId,
+            nombre,
+            fecha_inicio: fechaInicio,
+            created_at: createdAt,
+            updated_at: updatedAt,
+            sync_status: syncStatus,
+          };
+
+          saveState(state);
+        }
+
+        return;
+      }
+
+      const [nombre, updatedAt, syncStatus, localId] = params as [
+        string,
+        string | null,
+        string,
+        string,
+      ];
+
+      const existingMeta = state.metas[localId];
+
+      if (existingMeta) {
+        state.metas[localId] = {
+          ...existingMeta,
+          nombre,
+          updated_at: updatedAt,
+          sync_status: syncStatus,
+        };
+
+        saveState(state);
+      }
+
+      return;
+    }
+
     if (normalizedSql.startsWith('INSERT INTO OBJETIVOS')) {
       const [
         localId,
         remoteId,
         userRemoteId,
         metaLocalId,
-        habitoLocalId,
         nombre,
         metaEsperada,
         fechaLimite,
@@ -459,7 +1074,6 @@ const webDatabase: AppDatabase = {
         number | null,
         number | null,
         string | null,
-        string,
         string,
         number,
         string,
@@ -473,7 +1087,6 @@ const webDatabase: AppDatabase = {
         remote_id: remoteId,
         user_remote_id: userRemoteId,
         meta_local_id: metaLocalId,
-        habito_local_id: habitoLocalId,
         nombre,
         meta_esperada: metaEsperada,
         fecha_limite: fechaLimite,
@@ -482,6 +1095,161 @@ const webDatabase: AppDatabase = {
         sync_status: syncStatus,
       };
 
+      saveState(state);
+      return;
+    }
+
+    if (normalizedSql.startsWith('INSERT INTO OBJETIVO_HABITOS')) {
+      const [localId, remoteId, objetivoLocalId, habitoLocalId, createdAt, updatedAt, syncStatus] = params as [
+        string,
+        number | null,
+        string,
+        string,
+        string | null,
+        string | null,
+        string,
+      ];
+
+      state.objetivoHabitos[localId] = {
+        local_id: localId,
+        remote_id: remoteId,
+        objetivo_local_id: objetivoLocalId,
+        habito_local_id: habitoLocalId,
+        created_at: createdAt,
+        updated_at: updatedAt,
+        sync_status: syncStatus,
+      };
+
+      saveState(state);
+      return;
+    }
+
+    if (normalizedSql.startsWith('UPDATE OBJETIVO_HABITOS')) {
+      const [remoteId, objetivoLocalId, habitoLocalId, createdAt, updatedAt, syncStatus, localId] =
+        params as [
+          number | null,
+          string,
+          string,
+          string | null,
+          string | null,
+          string,
+          string,
+        ];
+
+      const existingLink = state.objetivoHabitos[localId];
+
+      if (existingLink) {
+        state.objetivoHabitos[localId] = {
+          ...existingLink,
+          remote_id: remoteId,
+          objetivo_local_id: objetivoLocalId,
+          habito_local_id: habitoLocalId,
+          created_at: createdAt,
+          updated_at: updatedAt,
+          sync_status: syncStatus,
+        };
+
+        saveState(state);
+      }
+
+      return;
+    }
+
+    if (normalizedSql.startsWith('UPDATE OBJETIVOS')) {
+      if (normalizedSql.includes('SET REMOTE_ID =')) {
+        const [
+          remoteId,
+          userRemoteId,
+          metaLocalId,
+          nombre,
+          metaEsperada,
+          fechaLimite,
+          createdAt,
+          updatedAt,
+          syncStatus,
+          localId,
+        ] = params as [
+          number | null,
+          number | null,
+          string | null,
+          string,
+          number,
+          string,
+          string | null,
+          string | null,
+          string,
+          string,
+        ];
+
+        const existingObjetivo = state.objetivos[localId];
+
+        if (existingObjetivo) {
+          state.objetivos[localId] = {
+            ...existingObjetivo,
+            remote_id: remoteId,
+            user_remote_id: userRemoteId,
+            meta_local_id: metaLocalId,
+            nombre,
+            meta_esperada: metaEsperada,
+            fecha_limite: fechaLimite,
+            created_at: createdAt,
+            updated_at: updatedAt,
+            sync_status: syncStatus,
+          };
+
+          saveState(state);
+        }
+
+        return;
+      }
+
+      const [nombre, metaEsperada, fechaLimite, updatedAt, syncStatus, localId] = params as [
+        string,
+        number,
+        string,
+        string | null,
+        string,
+        string,
+      ];
+
+      const existingObjetivo = state.objetivos[localId];
+
+      if (existingObjetivo) {
+        state.objetivos[localId] = {
+          ...existingObjetivo,
+          nombre,
+          meta_esperada: metaEsperada,
+          fecha_limite: fechaLimite,
+          updated_at: updatedAt,
+          sync_status: syncStatus,
+        };
+
+        saveState(state);
+      }
+
+      return;
+    }
+
+    if (normalizedSql.startsWith('DELETE FROM OBJETIVO_HABITOS')) {
+      const [value] = params as [string];
+
+      if (normalizedSql.includes('WHERE LOCAL_ID =')) {
+        delete state.objetivoHabitos[value];
+      } else {
+        for (const [localId, pivot] of Object.entries(state.objetivoHabitos)) {
+          if (pivot.objetivo_local_id === value) {
+            delete state.objetivoHabitos[localId];
+          }
+        }
+      }
+
+      saveState(state);
+      return;
+    }
+
+    if (normalizedSql.startsWith('DELETE FROM OBJETIVOS')) {
+      const [localId] = params as [string];
+      delete state.objetivos[localId];
       saveState(state);
       return;
     }
@@ -532,12 +1300,20 @@ const webDatabase: AppDatabase = {
       return { count: Object.keys(state.actividadHabitos).length } as T;
     }
 
+    if (normalizedSql === 'SELECT COUNT(*) AS COUNT FROM TAREAS;') {
+      return { count: Object.values(state.tareas).filter((item) => !item.deleted_at).length } as T;
+    }
+
     if (normalizedSql === 'SELECT COUNT(*) AS COUNT FROM METAS;') {
       return { count: Object.keys(state.metas).length } as T;
     }
 
     if (normalizedSql === 'SELECT COUNT(*) AS COUNT FROM OBJETIVOS;') {
       return { count: Object.keys(state.objetivos).length } as T;
+    }
+
+    if (normalizedSql === 'SELECT COUNT(*) AS COUNT FROM OBJETIVO_HABITOS;') {
+      return { count: Object.keys(state.objetivoHabitos).length } as T;
     }
 
     if (normalizedSql === 'SELECT COUNT(*) AS COUNT FROM SYNC_QUEUE;') {
@@ -552,6 +1328,28 @@ const webDatabase: AppDatabase = {
     if (normalizedSql.includes('FROM USERS') && normalizedSql.includes('WHERE LOCAL_ID =')) {
       const [localId] = params as unknown as [string];
       return (state.users[localId] ?? null) as T | null;
+    }
+
+    if (normalizedSql.includes('FROM HABITOS') && normalizedSql.includes('WHERE LOCAL_ID =')) {
+      const [localId] = params as unknown as [string];
+      const habit = state.habitos[localId];
+
+      if (!habit || habit.deleted_at) {
+        return null;
+      }
+
+      return habit as T;
+    }
+
+    if (normalizedSql.includes('FROM RUTINAS') && normalizedSql.includes('WHERE LOCAL_ID =')) {
+      const [localId] = params as unknown as [string];
+      const routine = state.rutinas[localId];
+
+      if (!routine || routine.deleted_at) {
+        return null;
+      }
+
+      return routine as T;
     }
 
     return null;
@@ -607,14 +1405,45 @@ const webDatabase: AppDatabase = {
         .sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? '')) as T[];
     }
 
+    if (normalizedSql.includes('FROM TAREAS')) {
+      const shouldFilterDeleted = normalizedSql.includes('WHERE DELETED_AT IS NULL');
+      const shouldFilterPendingDelete = normalizedSql.includes("SYNC_STATUS != 'PENDING_DELETE'");
+
+      return Object.values(state.tareas)
+        .filter((item) => (shouldFilterDeleted ? !item.deleted_at : true))
+        .filter((item) => (shouldFilterPendingDelete ? item.sync_status !== 'pending_delete' : true))
+        .sort((a, b) => {
+          if (a.hora_inicio === b.hora_inicio) {
+            return (b.created_at ?? '').localeCompare(a.created_at ?? '');
+          }
+
+          if (a.hora_inicio === null) {
+            return 1;
+          }
+
+          if (b.hora_inicio === null) {
+            return -1;
+          }
+
+          return a.hora_inicio.localeCompare(b.hora_inicio);
+        }) as T[];
+    }
+
     if (normalizedSql.includes('FROM METAS')) {
       return Object.values(state.metas)
+        .filter((item) => item.sync_status !== 'pending_delete')
         .sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? '')) as T[];
     }
 
     if (normalizedSql.includes('FROM OBJETIVOS')) {
       return Object.values(state.objetivos)
+        .filter((item) => item.sync_status !== 'pending_delete')
         .sort((a, b) => (a.fecha_limite ?? '').localeCompare(b.fecha_limite ?? '')) as T[];
+    }
+
+    if (normalizedSql.includes('FROM OBJETIVO_HABITOS')) {
+      return Object.values(state.objetivoHabitos)
+        .sort((a, b) => a.objetivo_local_id.localeCompare(b.objetivo_local_id) || a.habito_local_id.localeCompare(b.habito_local_id)) as T[];
     }
 
     return [];
@@ -636,4 +1465,22 @@ export async function getDatabaseStatus() {
     routinesCount: Object.values(state.rutinas).filter((item) => !item.deleted_at).length,
     queueCount: state.syncQueueCount,
   };
+}
+
+export async function clearLocalDomainData(): Promise<void> {
+  const state = loadState();
+
+  state.habitos = {};
+  state.rutinas = {};
+  state.rutinaHabitos = {};
+  state.rutinaDias = {};
+  state.registroHabitos = {};
+  state.actividadHabitos = {};
+  state.tareas = {};
+  state.metas = {};
+  state.objetivos = {};
+  state.objetivoHabitos = {};
+  state.syncQueueCount = 0;
+
+  saveState(state);
 }
