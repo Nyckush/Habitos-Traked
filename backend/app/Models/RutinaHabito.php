@@ -2,13 +2,18 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\Pivot;
 
-class RutinaHabito extends Pivot
+class RutinaHabito extends Model
 {
     public $timestamps = false;
     public $incrementing = true;
+
+    /**
+     * @var string
+     */
+    protected $table = 'rutina_habitos';
 
     /**
      * @var list<string>
