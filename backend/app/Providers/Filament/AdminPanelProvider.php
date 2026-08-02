@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\EditProfile;
 use App\Filament\Pages\MisRutinasHoy;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -28,7 +29,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
-            ->profile()
+            ->profile(EditProfile::class)
             ->homeUrl('/admin/mis-rutinas-hoy')
             ->brandLogo(asset('logoModoDia.png'))
             ->darkModeBrandLogo(asset('logoModoNoche.png'))
