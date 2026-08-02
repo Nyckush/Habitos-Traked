@@ -127,6 +127,16 @@ class TareaController extends Controller
             return null;
         }
 
-        return Carbon::createFromFormat('H:i:s', $value)->format('H:i');
+        $normalizedValue = trim($value);
+
+        foreach (['H:i:s', 'H:i'] as $format) {
+            try {
+                return Carbon::createFromFormat($format, $normalizedValue)->format('H:i');
+            } catch (\Throwable) {
+                // Intentamos con el siguiente formato valido.
+            }
+        }
+
+        return substr($normalizedValue, 0, 5);
     }
 }
