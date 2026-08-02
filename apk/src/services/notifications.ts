@@ -94,11 +94,13 @@ async function getNotificationsModule(): Promise<ExpoNotificationsModule | null>
 }
 
 function parseHour(value: string): { hour: number; minute: number } | null {
-  if (!/^\d{2}:\d{2}$/.test(value)) {
+  const normalizedValue = value.trim();
+
+  if (!/^\d{2}:\d{2}(:\d{2})?$/.test(normalizedValue)) {
     return null;
   }
 
-  const [hour, minute] = value.split(':').map(Number);
+  const [hour, minute] = normalizedValue.split(':').slice(0, 2).map(Number);
 
   if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
     return null;

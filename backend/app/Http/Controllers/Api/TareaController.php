@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Tarea;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 
 class TareaController extends Controller
@@ -111,12 +112,21 @@ class TareaController extends Controller
             'id' => $tarea->id,
             'user_id' => $tarea->user_id,
             'titulo' => $tarea->titulo,
-            'hora_inicio' => $tarea->hora_inicio,
+            'hora_inicio' => $this->formatTime($tarea->hora_inicio),
             'estado' => $tarea->estado,
             'completed_at' => $tarea->completed_at?->toISOString(),
             'created_at' => $tarea->created_at?->toISOString(),
             'updated_at' => $tarea->updated_at?->toISOString(),
             'deleted_at' => $tarea->deleted_at?->toISOString(),
         ];
+    }
+
+    private function formatTime(?string $value): ?string
+    {
+        if ($value === null || trim($value) === '') {
+            return null;
+        }
+
+        return Carbon::createFromFormat('H:i:s', $value)->format('H:i');
     }
 }

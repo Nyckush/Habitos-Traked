@@ -8,6 +8,7 @@ use App\Models\Rutina;
 use App\Models\RutinaHabito;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class RutinaHabitoController extends Controller
 {
@@ -105,7 +106,16 @@ class RutinaHabitoController extends Controller
             'id' => $link->id,
             'rutina_id' => $link->rutina_id,
             'habito_id' => $link->habito_id,
-            'hora_inicio' => $link->hora_inicio,
+            'hora_inicio' => $this->formatTime($link->hora_inicio),
         ];
+    }
+
+    private function formatTime(?string $value): ?string
+    {
+        if ($value === null || trim($value) === '') {
+            return null;
+        }
+
+        return Carbon::createFromFormat('H:i:s', $value)->format('H:i');
     }
 }

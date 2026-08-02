@@ -33,11 +33,11 @@ function normalizeHoraInicio(value?: string | null): string | null {
     return null;
   }
 
-  if (!/^\d{2}:\d{2}$/.test(normalized)) {
+  if (!/^\d{2}:\d{2}(:\d{2})?$/.test(normalized)) {
     throw new Error('La hora debe tener formato HH:MM.');
   }
 
-  return normalized;
+  return normalized.slice(0, 5);
 }
 
 export async function createTask(input: CreateTaskInput): Promise<Task> {
