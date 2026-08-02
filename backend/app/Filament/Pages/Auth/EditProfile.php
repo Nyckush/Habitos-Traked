@@ -21,6 +21,7 @@ class EditProfile extends BaseEditProfile
         return FileUpload::make('perfil')
             ->label('Foto de perfil')
             ->avatar()
+            ->alignCenter()
             ->disk('public')
             ->directory(fn (): string => 'profiles/' . $this->getUser()->getKey())
             ->visibility('public')

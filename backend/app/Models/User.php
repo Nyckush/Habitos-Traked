@@ -124,14 +124,16 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
             return null;
         }
 
-        if (str_starts_with($this->perfil, 'http://') || str_starts_with($this->perfil, 'https://')) {
+        if (str_starts_with($this->perfil, '/storage/')) {
             return $this->perfil;
         }
 
-        if (str_starts_with($this->perfil, '/storage/')) {
-            return rtrim((string) config('app.url'), '/') . $this->perfil;
+        if (str_starts_with($this->perfil, 'http://') || str_starts_with($this->perfil, 'https://')) {
+            $path = parse_url($this->perfil, PHP_URL_PATH);
+
+            return is_string($path) && $path !== '' ? $path : $this->perfil;
         }
 
-        return rtrim((string) config('app.url'), '/') . Storage::disk('public')->url($this->perfil);
+        return Storage::disk('public')->url($this->perfil);
     }
 }
