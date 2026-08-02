@@ -142,11 +142,11 @@ class AuthController extends Controller
             return $path;
         }
 
-        $relativePath = str_starts_with($path, '/storage/')
-            ? $path
-            : Storage::disk('public')->url($path);
+        if (str_starts_with($path, '/storage/')) {
+            return $this->resolvePublicBaseUrl() . $path;
+        }
 
-        return $this->resolvePublicBaseUrl() . $relativePath;
+        return $this->resolvePublicBaseUrl() . '/storage/' . ltrim($path, '/');
     }
 
     private function resolvePublicBaseUrl(): string
