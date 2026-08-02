@@ -142,11 +142,29 @@ class AuthController extends Controller
             return $path;
         }
 
-        if (str_starts_with($path, '/storage/')) {
-            return request()->getSchemeAndHttpHost() . $path;
+        $relativePath = str_starts_with($path, '/storage/')
+            ? $path
+            : Storage::disk('public')->url($path);
+
+        return $this->resolvePublicBaseUrl() . $relativePath;
+    }
+
+    private function resolvePublicBaseUrl(): string
+    {
+        $configuredAppUrl = rtrim((string) config('app.url'), '/');
+
+        if ($configuredAppUrl !== '' && ! str_contains($configuredAppUrl, 'localhost')) {
+            return $configuredAppUrl;
         }
 
-        return request()->getSchemeAndHttpHost() . Storage::disk('public')->url($path);
+        $requestHost = request()->getHost();
+        $requestScheme = request()->isSecure() ? 'https' : request()->getScheme();
+
+        if ($requestHost && ! in_array($requestHost, ['localhost', '127.0.0.1'], true)) {
+            return $requestScheme . '://' . $requestHost;
+        }
+
+        return rtrim(request()->getSchemeAndHttpHost(), '/');
     }
 
     private function deleteStoredProfilePhoto(string $path): void
