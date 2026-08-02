@@ -101,19 +101,7 @@ export default function ObjectiveCreateHabitsScreen() {
         <View style={styles.content}>
           <View style={styles.headerRow}>
             <Pressable
-              onPress={() =>
-                router.replace({
-                  pathname: '/metas/[metaId]/objectives/create',
-                  params: {
-                    metaId: metaLocalId,
-                    objectiveId: objectiveLocalId,
-                    objectiveName: name,
-                    selectedHabitIds: selectedIds.join(','),
-                    metaEsperada: resolveParam(metaEsperada),
-                    fechaLimite: resolveParam(fechaLimite),
-                  },
-                })
-              }
+              onPress={() => router.back()}
               hitSlop={12}
               style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}>
               <ThemedText style={styles.backButtonText}>{'<'}</ThemedText>

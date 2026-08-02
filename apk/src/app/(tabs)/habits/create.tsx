@@ -84,7 +84,7 @@ export default function HabitsCreateScreen() {
         <View style={styles.content}>
           <View style={styles.headerRow}>
             <Pressable
-              onPress={() => router.replace('/habits')}
+              onPress={() => router.back()}
               hitSlop={12}
               style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}>
               <ThemedText style={styles.backButtonText}>{'<'}</ThemedText>

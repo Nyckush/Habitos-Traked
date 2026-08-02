@@ -84,7 +84,7 @@ export default function MetasCreateScreen() {
         <View style={styles.content}>
           <View style={styles.headerRow}>
             <Pressable
-              onPress={() => router.replace('/metas')}
+              onPress={() => router.back()}
               hitSlop={12}
               style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}>
               <ThemedText style={styles.backButtonText}>{'<'}</ThemedText>

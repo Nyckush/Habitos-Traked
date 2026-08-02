@@ -2,7 +2,7 @@
   "expo": {
     "name": "habitracked-mobile",
     "slug": "habitracked-mobile",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "habitrackedmobile",
@@ -37,7 +37,12 @@
       [
         "expo-notifications",
         {
-          "defaultChannel": "reminders"
+          "defaultChannel": "reminders-default",
+          "sounds": [
+            "./assets/Notificaciones/notificacion1.mp3",
+            "./assets/Notificaciones/notificacion2.mp3",
+            "./assets/Notificaciones/notificacion3.mp3"
+          ]
         }
       ]
     ],

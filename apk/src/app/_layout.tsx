@@ -14,17 +14,17 @@ SplashScreen.preventAutoHideAsync();
 
 function NotificationsBootstrap() {
   const { isReady } = useDatabase();
-  const { token, user } = useAuth();
+  const { isLoading, token, user } = useAuth();
 
   useEffect(() => {
-    if (!isReady) {
+    if (!isReady || isLoading) {
       return;
     }
 
     void syncScheduledNotificationsAsync().catch((error) => {
       console.warn('No se pudieron sincronizar las notificaciones locales.', error);
     });
-  }, [isReady, token, user?.id]);
+  }, [isReady, isLoading, token, user?.id]);
 
   return null;
 }

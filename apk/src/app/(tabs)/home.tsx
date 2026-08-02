@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import {
   completeTask,
   listHabitRecords,
@@ -198,6 +199,8 @@ export default function HomeScreen() {
     [loadData, token, user],
   );
 
+  const { refreshing, handleRefresh } = usePullToRefresh(loadData);
+
   useFocusEffect(
     useCallback(() => {
       if (!isReady) {
@@ -252,7 +255,9 @@ export default function HomeScreen() {
   }, [taskButtonScale]);
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent}>
+    <ScrollView
+      contentContainerStyle={styles.scrollContent}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} />}>
       <ThemedView style={styles.container}>
         <View style={styles.content}>
           <View style={styles.titleRow}>

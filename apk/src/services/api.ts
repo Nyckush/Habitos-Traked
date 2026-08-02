@@ -24,6 +24,7 @@ export type ApiClientOptions = {
   token?: string | null;
   headers?: Record<string, string>;
   body?: ApiRequestBody;
+  formData?: FormData;
 };
 
 export type AuthUser = {
@@ -62,6 +63,12 @@ export type CurrentUserResponse = {
 
 export type LogoutResponse = {
   message: string;
+};
+
+export type UpdateProfilePayload = {
+  username: string;
+  perfilUri?: string | null;
+  removeProfilePhoto?: boolean;
 };
 
 export type RemoteHabit = {
@@ -290,7 +297,7 @@ async function request<TResponse>(
   const response = await fetch(buildUrl(path), {
     method,
     headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
+    body: options.formData ?? (options.body ? JSON.stringify(options.body) : undefined),
   });
 
   const payload = await parseResponse(response);
@@ -394,6 +401,43 @@ export const authApi = {
   },
   logout(token: string) {
     return apiClient.post<LogoutResponse>('/api/auth/logout', { token });
+  },
+  async updateProfile(token: string, payload: UpdateProfilePayload): Promise<CurrentUserResponse> {
+    const formData = new FormData();
+
+    formData.append('username', payload.username.trim());
+
+    if (payload.removeProfilePhoto) {
+      formData.append('remove_profile_photo', '1');
+    }
+
+    if (payload.perfilUri) {
+      const uriParts = payload.perfilUri.split(/[\\/]/);
+      const fileName = uriParts[uriParts.length - 1] || `profile-${Date.now()}.jpg`;
+      const extensionMatch = fileName.match(/\.([a-zA-Z0-9]+)$/);
+      const extension = extensionMatch?.[1]?.toLowerCase() ?? 'jpg';
+      const mimeType =
+        extension === 'png'
+          ? 'image/png'
+          : extension === 'webp'
+            ? 'image/webp'
+            : 'image/jpeg';
+
+      formData.append('perfil', {
+        uri: payload.perfilUri,
+        name: fileName,
+        type: mimeType,
+      } as unknown as Blob);
+    }
+
+    const response = await apiClient.post<CurrentUserResponse & { user: unknown }>('/api/auth/profile', {
+      token,
+      formData,
+    });
+
+    return {
+      user: normalizeAuthUser(response.user),
+    };
   },
 };
 

@@ -3,7 +3,12 @@ import { getDatabase } from '../client';
 const NOTIFICATIONS_ENABLED_KEY = 'settings.notifications.enabled';
 const NOTIFICATION_TONE_KEY = 'settings.notifications.tone';
 
-export type NotificationTone = 'default' | 'silent';
+export type NotificationTone =
+  | 'default'
+  | 'silent'
+  | 'notificacion1'
+  | 'notificacion2'
+  | 'notificacion3';
 
 export type NotificationSettings = {
   enabled: boolean;
@@ -42,7 +47,13 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
 
   return {
     enabled: enabledValue === null ? true : enabledValue === 'true',
-    tone: toneValue === 'silent' ? 'silent' : 'default',
+    tone:
+      toneValue === 'silent'
+      || toneValue === 'notificacion1'
+      || toneValue === 'notificacion2'
+      || toneValue === 'notificacion3'
+        ? toneValue
+        : 'default',
   };
 }
 

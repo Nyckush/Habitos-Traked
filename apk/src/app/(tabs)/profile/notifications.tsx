@@ -28,6 +28,21 @@ const TONE_OPTIONS: {
     title: 'Silencioso',
     description: 'La notificacion llega sin sonido.',
   },
+  {
+    value: 'notificacion1',
+    title: 'Tono 1',
+    description: 'Usa el sonido notificacion1 de la app.',
+  },
+  {
+    value: 'notificacion2',
+    title: 'Tono 2',
+    description: 'Usa el sonido notificacion2 de la app.',
+  },
+  {
+    value: 'notificacion3',
+    title: 'Tono 3',
+    description: 'Usa el sonido notificacion3 de la app.',
+  },
 ];
 
 export default function ProfileNotificationsScreen() {
@@ -93,7 +108,7 @@ export default function ProfileNotificationsScreen() {
         <View style={styles.content}>
           <View style={styles.headerRow}>
             <Pressable
-              onPress={() => router.replace('/profile')}
+              onPress={() => router.back()}
               hitSlop={12}
               style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}>
               <ThemedText style={styles.backButtonText}>{'<'}</ThemedText>
@@ -140,7 +155,7 @@ export default function ProfileNotificationsScreen() {
           <View style={styles.sectionBlock}>
             <ThemedText style={styles.blockTitle}>Tono de la notificacion</ThemedText>
             <ThemedText themeColor="textSecondary" style={styles.blockSubtitle}>
-              En esta version puedes elegir sonido normal o silencioso.
+              Puedes elegir el sonido del sistema, modo silencioso o uno de los tonos de la app.
             </ThemedText>
           </View>
 

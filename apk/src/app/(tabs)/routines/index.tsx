@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
 
@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset } from '@/constants/theme';
 import { listRoutineDays, listRoutines, type Routine, type RoutineDay } from '@/database';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useAuth } from '@/providers/auth-provider';
 import { useDatabase } from '@/providers/database-provider';
 import { pullRoutines } from '@/services/routines-sync';
@@ -27,6 +28,8 @@ export default function RoutinesListScreen() {
     setRoutineDays(routineDaysData);
   }, [token, user]);
 
+  const { refreshing, handleRefresh } = usePullToRefresh(loadData);
+
   useFocusEffect(
     useCallback(() => {
       if (!isReady) {
@@ -43,7 +46,9 @@ export default function RoutinesListScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} />}>
         <View style={styles.container}>
           <View style={styles.content}>
             <View style={styles.titleRow}>
@@ -175,7 +180,7 @@ const styles = StyleSheet.create({
   floatingButton: {
     position: 'absolute',
     right: 24,
-    bottom: BottomTabInset + 92,
+    bottom: 122,
     minHeight: 52,
     borderRadius: 999,
     backgroundColor: '#1E1E24',

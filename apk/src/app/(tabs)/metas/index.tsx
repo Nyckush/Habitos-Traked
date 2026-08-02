@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
 
@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset } from '@/constants/theme';
 import { listMetasWithEstado, type MetaWithEstado } from '@/database';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useAuth } from '@/providers/auth-provider';
 import { useDatabase } from '@/providers/database-provider';
 import { pullGoals } from '@/services/goals-sync';
@@ -16,10 +17,20 @@ export default function MetasListScreen() {
   const { isReady } = useDatabase();
   const [metas, setMetas] = useState<MetaWithEstado[]>([]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     const metasData = await listMetasWithEstado();
     setMetas(metasData);
-  };
+  }, []);
+
+  const refreshData = useCallback(async () => {
+    if (token && user) {
+      await pullGoals(token, user.id);
+    }
+
+    await loadData();
+  }, [loadData, token, user]);
+
+  const { refreshing, handleRefresh } = usePullToRefresh(refreshData);
 
   useFocusEffect(
     useCallback(() => {
@@ -28,22 +39,18 @@ export default function MetasListScreen() {
       }
 
       const timerId = setTimeout(() => {
-        void (async () => {
-          if (token && user) {
-            await pullGoals(token, user.id);
-          }
-
-          await loadData();
-        })();
+        void refreshData();
       }, 0);
 
       return () => clearTimeout(timerId);
-    }, [isReady, token, user]),
+    }, [isReady, refreshData]),
   );
 
   return (
     <ThemedView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} />}>
         <View style={styles.container}>
           <View style={styles.content}>
             <View style={styles.titleRow}>
@@ -168,7 +175,7 @@ const styles = StyleSheet.create({
   floatingButton: {
     position: 'absolute',
     right: 24,
-    bottom: BottomTabInset + 92,
+    bottom: 122,
     minHeight: 52,
     borderRadius: 999,
     backgroundColor: '#1E1E24',

@@ -1,37 +1,66 @@
 import { Tabs } from 'expo-router';
-import { StyleSheet, View, useColorScheme } from 'react-native';
+import { Image, StyleSheet, View, useColorScheme } from 'react-native';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { ComponentProps } from 'react';
 
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/providers/auth-provider';
 
+type MaterialIconName = ComponentProps<typeof MaterialDesignIcons>['name'];
+
 export default function AppTabsLayout() {
   const scheme = useColorScheme();
   const theme = Colors[scheme === 'dark' ? 'dark' : 'light'];
+  const activeTabColor = '#208AEF';
   const insets = useSafeAreaInsets();
   const { token, user } = useAuth();
-  const bottomInset = Math.max(insets.bottom, 10);
+  const profileUri = user?.perfil ?? null;
+  const bottomInset = 0;
+  const tabBarBottomOffset = 0;
   const navigationSessionKey = token && user ? `auth-${user.id}` : 'guest';
 
   function renderTabIcon(
     focused: boolean,
     color: string,
     size: number,
-    activeIcon: string,
-    inactiveIcon: string,
+    activeIcon: MaterialIconName,
+    inactiveIcon: MaterialIconName,
   ) {
     return (
-      <View
-        style={[
-          styles.iconContainer,
-          { backgroundColor: focused ? theme.backgroundSelected : 'transparent' },
-        ]}>
+      <View style={styles.iconContainer}>
         <MaterialDesignIcons
           name={focused ? activeIcon : inactiveIcon}
-          color={focused ? theme.text : color}
+          color={focused ? activeTabColor : color}
           size={focused ? size + 1 : size}
         />
+      </View>
+    );
+  }
+
+  function renderProfileTabIcon(focused: boolean, color: string, size: number) {
+    return (
+      <View style={[styles.iconContainer, styles.profileIconContainer]}>
+        {profileUri ? (
+          <Image
+            source={{ uri: profileUri }}
+            resizeMode="contain"
+            style={[
+              styles.profileTabImage,
+              {
+                width: focused ? size + 10 : size + 8,
+                height: focused ? size + 10 : size + 8,
+                borderColor: focused ? activeTabColor : '#27272A',
+              },
+            ]}
+          />
+        ) : (
+          <MaterialDesignIcons
+            name={focused ? 'account-circle' : 'account-circle-outline'}
+            color={focused ? activeTabColor : color}
+            size={focused ? size + 3 : size + 2}
+          />
+        )}
       </View>
     );
   }
@@ -41,20 +70,20 @@ export default function AppTabsLayout() {
       key={navigationSessionKey}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: theme.text,
+        tabBarActiveTintColor: activeTabColor,
         tabBarInactiveTintColor: theme.textSecondary,
         tabBarStyle: {
           backgroundColor: theme.background,
           borderTopColor: '#27272A',
           borderTopWidth: 1,
-          height: 72 + bottomInset,
-          paddingTop: 8,
+          height: 62 + bottomInset,
+          paddingTop: 6,
           paddingBottom: bottomInset,
-          paddingHorizontal: 8,
+          paddingHorizontal: 4,
           position: 'absolute',
-          left: 12,
-          right: 12,
-          bottom: bottomInset,
+          left: 8,
+          right: 8,
+          bottom: 50,
           borderRadius: 18,
           shadowColor: '#000000',
           shadowOpacity: 0.35,
@@ -70,6 +99,8 @@ export default function AppTabsLayout() {
           fontWeight: '600',
         },
         tabBarItemStyle: {
+          flex: 1,
+          minWidth: 0,
           paddingVertical: 4,
         },
       }}>
@@ -90,18 +121,6 @@ export default function AppTabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="habits/create"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="habits/[habitId]"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
         name="routines"
         options={{
           title: 'Rutinas',
@@ -109,36 +128,8 @@ export default function AppTabsLayout() {
             renderTabIcon(focused, color, size, 'repeat', 'repeat'),
         }}
       />
-      <Tabs.Screen
-        name="routines/create"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="routines/[routineId]"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="routines/[routineId]/organize"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="routines/[routineId]/habits"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="routines/[routineId]/habits/[habitId]"
-        options={{
-          href: null,
-        }}
-      />
+
+      
       <Tabs.Screen
         name="metas"
         options={{
@@ -147,62 +138,15 @@ export default function AppTabsLayout() {
             renderTabIcon(focused, color, size, 'trophy', 'trophy-outline'),
         }}
       />
-      <Tabs.Screen
-        name="metas/create"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="metas/[metaId]"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="metas/[metaId]/plan"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="metas/[metaId]/objectives/create"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="metas/[metaId]/objectives/habits"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="metas/[metaId]/objectives/details"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
+
+         <Tabs.Screen
         name="profile"
         options={{
           title: 'Perfil',
-          tabBarIcon: ({ color, size, focused }) =>
-            renderTabIcon(focused, color, size, 'account-circle', 'account-circle-outline'),
+          tabBarIcon: ({ color, size, focused }) => renderProfileTabIcon(focused, color, size),
         }}
       />
-      <Tabs.Screen
-        name="profile/edit"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="profile/notifications"
-        options={{
-          href: null,
-        }}
-      />
+   
       <Tabs.Screen
         name="tasks/create"
         options={{
@@ -215,11 +159,18 @@ export default function AppTabsLayout() {
 
 const styles = StyleSheet.create({
   iconContainer: {
-    minWidth: 44,
-    height: 32,
-    borderRadius: 999,
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
+  },
+  profileIconContainer: {
+    width: '100%',
+    height: '100%',
+  },
+  profileTabImage: {
+    borderRadius: 999,
+    borderWidth: 1,
+    backgroundColor: '#0A0A0C',
   },
 });

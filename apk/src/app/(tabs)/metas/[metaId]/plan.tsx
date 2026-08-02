@@ -48,7 +48,7 @@ export default function MetaPlanScreen() {
           <View style={styles.content}>
             <View style={styles.headerRow}>
               <Pressable
-                onPress={() => router.replace('/metas')}
+                onPress={() => router.back()}
                 hitSlop={12}
                 style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}>
                 <ThemedText style={styles.backButtonText}>{'<'}</ThemedText>
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   floatingButton: {
     position: 'absolute',
     right: 24,
-    bottom: BottomTabInset + 92,
+    bottom: 122,
     minHeight: 52,
     borderRadius: 999,
     backgroundColor: '#1E1E24',

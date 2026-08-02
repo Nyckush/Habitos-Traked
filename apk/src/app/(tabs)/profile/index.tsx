@@ -1,9 +1,11 @@
-import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
+import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useAuth } from '@/providers/auth-provider';
 
 function getInitial(username: string | null | undefined): string {
@@ -13,21 +15,37 @@ function getInitial(username: string | null | undefined): string {
 }
 
 export default function ProfileScreen() {
-  const { token, user, signOut } = useAuth();
+  const { token, user, signOut, refreshCurrentUser } = useAuth();
   const profileUri = user?.perfil ?? null;
   const username = user?.username ?? 'Usuario local';
   const email = user?.email ?? 'Sin email';
   const isAuthenticated = Boolean(token && user);
+
+  const loadData = useCallback(async () => {
+    await refreshCurrentUser();
+  }, [refreshCurrentUser]);
+
+  const { refreshing, handleRefresh } = usePullToRefresh(loadData);
+
+  useFocusEffect(
+    useCallback(() => {
+      const timerId = setTimeout(() => {
+        void loadData();
+      }, 0);
+
+      return () => clearTimeout(timerId);
+    }, [loadData]),
+  );
 
   async function handleSignOut() {
     await signOut();
     router.replace('/profile');
   }
 
-
-
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent}>
+    <ScrollView
+      contentContainerStyle={styles.scrollContent}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} />}>
       <ThemedView style={styles.container}>
         <View style={styles.content}>
           <View style={styles.titleRow}>
@@ -87,14 +105,16 @@ export default function ProfileScreen() {
 
           {isAuthenticated ? (
             <View style={styles.footerActions}>
-           
-              <Pressable onPress={() => void handleSignOut()} style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}>
-                <ThemedText style={styles.secondaryButtonText}>Cerrar sesion</ThemedText>
-              </Pressable>
-                 <Pressable onPress={() => router.push('/profile/notifications')} style={({ pressed }) => [styles.editButton, styles.notificationsButton, pressed && styles.buttonPressed]}>
-                <MaterialDesignIcons name="bell-outline" size={16} color="#FFFFFF" />
-                <ThemedText style={styles.editButtonText}>Notificaciones</ThemedText>
-              </Pressable>
+              <View style={styles.footerRow}>
+                <Pressable onPress={() => void handleSignOut()} style={({ pressed }) => [styles.secondaryButton, styles.footerButton, pressed && styles.buttonPressed]}>
+                  <ThemedText style={styles.secondaryButtonText}>Cerrar sesion</ThemedText>
+                </Pressable>
+
+                <Pressable onPress={() => router.push('/profile/notifications')} style={({ pressed }) => [styles.editButton, styles.footerButton, pressed && styles.buttonPressed]}>
+                  <MaterialDesignIcons name="bell-outline" size={16} color="#FFFFFF" />
+                  <ThemedText style={styles.editButtonText}>Notificaciones</ThemedText>
+                </Pressable>
+              </View>
             </View>
           ) : null}
         </View>
@@ -260,15 +280,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
     gap: 12,
   },
-  notificationsButton: {
-    alignSelf: 'flex-start',
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  infoCard: {
-    paddingTop: 8,
-    gap: 8,
-  },
-  sectionTitle: {
-    fontWeight: '700',
-    color: '#FFFFFF',
+  footerButton: {
+    flex: 1,
   },
 });

@@ -10,10 +10,17 @@ import {
   setCurrentAuthUser,
   updateCurrentAuthUser,
 } from '@/database';
-import { authApi, type AuthUser, type LoginPayload, type RegisterPayload } from '@/services';
+import {
+  ApiError,
+  authApi,
+  type AuthUser,
+  type LoginPayload,
+  type RegisterPayload,
+} from '@/services';
 import { pullGoals, syncGoals } from '@/services/goals-sync';
 import { pullHabits, syncHabits } from '@/services/habits-sync';
 import { pullHabitRecords, syncHabitRecords } from '@/services/habit-records-sync';
+import { clearScheduledNotificationsAsync, syncScheduledNotificationsAsync } from '@/services/notifications';
 import { pullRoutineHabitLinks, syncRoutineHabitLinks } from '@/services/routine-habit-links-sync';
 import { pullRoutines, syncRoutines } from '@/services/routines-sync';
 import { pullTasks, syncTasks } from '@/services/tasks-sync';
@@ -26,6 +33,7 @@ type AuthContextValue = {
   signUp: (payload: RegisterPayload) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (payload: { username: string; perfil: string | null }) => Promise<void>;
+  refreshCurrentUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -39,6 +47,18 @@ const shouldUseSecureStore =
 
 function getDeviceName(): string {
   return Constants.deviceName ?? 'apk';
+}
+
+function mergeAuthUserWithLocalProfile(remoteUser: AuthUser, localUser: AuthUser | null): AuthUser {
+  if (!localUser || localUser.id !== remoteUser.id) {
+    return remoteUser;
+  }
+
+  return {
+    ...remoteUser,
+    username: localUser.username?.trim() ? localUser.username : remoteUser.username,
+    perfil: localUser.perfil?.trim() ? localUser.perfil : remoteUser.perfil,
+  };
 }
 
 async function getStoredToken(): Promise<string | null> {
@@ -98,24 +118,30 @@ export function AuthProvider({ children }: PropsWithChildren) {
         }
 
         const response = await authApi.me(storedToken);
+        const localUser = await getCurrentAuthUser();
+        const nextUser = mergeAuthUserWithLocalProfile(response.user, localUser);
 
         if (!mounted) {
           return;
         }
 
         setToken(storedToken);
-        setUser(response.user);
-        await pullHabits(storedToken, response.user.id);
-        await pullRoutines(storedToken, response.user.id);
+        setUser(nextUser);
+        await setCurrentAuthUser(nextUser);
+        await pullHabits(storedToken, nextUser.id);
+        await pullRoutines(storedToken, nextUser.id);
         await pullRoutineHabitLinks(storedToken);
         await pullHabitRecords(storedToken);
-        await pullGoals(storedToken, response.user.id);
-        await pullTasks(storedToken, response.user.id);
-      } catch {
+        await pullGoals(storedToken, nextUser.id);
+        await pullTasks(storedToken, nextUser.id);
+        await syncScheduledNotificationsAsync();
+      } catch (error) {
         const storedToken = await getStoredToken();
         const localUser = await getCurrentAuthUser();
+        const hasInvalidSession =
+          error instanceof ApiError && (error.status === 401 || error.status === 403);
 
-        if (storedToken && localUser) {
+        if (!hasInvalidSession && storedToken && localUser) {
           if (!mounted) {
             return;
           }
@@ -169,6 +195,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     await pullHabitRecords(response.token);
     await pullGoals(response.token, response.user.id);
     await pullTasks(response.token, response.user.id);
+    await syncScheduledNotificationsAsync();
   }
 
   async function signUp(payload: RegisterPayload) {
@@ -184,6 +211,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     await syncHabitRecords(response.token);
     await syncGoals(response.token, response.user.id);
     await syncTasks(response.token, response.user.id);
+    await syncScheduledNotificationsAsync();
   }
 
   async function signOut() {
@@ -198,6 +226,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
 
     await deleteStoredToken();
+    await clearScheduledNotificationsAsync();
     await clearLocalDomainData();
     await clearCurrentAuthUser();
     setToken(null);
@@ -205,7 +234,38 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }
 
   async function updateProfile(payload: { username: string; perfil: string | null }) {
-    const nextUser = await updateCurrentAuthUser(payload);
+    const shouldUploadNewProfilePhoto =
+      Boolean(payload.perfil) &&
+      (payload.perfil.startsWith('file://') || payload.perfil.startsWith('content://'));
+    const shouldRemoveRemoteProfilePhoto = payload.perfil === null && Boolean(user?.perfil);
+
+    const nextUser =
+      token && user
+        ? (
+            await authApi.updateProfile(token, {
+              username: payload.username,
+              perfilUri: shouldUploadNewProfilePhoto ? payload.perfil : null,
+              removeProfilePhoto: shouldRemoveRemoteProfilePhoto,
+            })
+          ).user
+        : await updateCurrentAuthUser(payload);
+
+    await setCurrentAuthUser(nextUser);
+    setUser(nextUser);
+  }
+
+  async function refreshCurrentUser() {
+    if (!token) {
+      const localUser = await getCurrentAuthUser();
+      setUser(localUser);
+      return;
+    }
+
+    const response = await authApi.me(token);
+    const localUser = await getCurrentAuthUser();
+    const nextUser = mergeAuthUserWithLocalProfile(response.user, localUser);
+
+    await setCurrentAuthUser(nextUser);
     setUser(nextUser);
   }
 
@@ -219,6 +279,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         signUp,
         signOut,
         updateProfile,
+        refreshCurrentUser,
       }}>
       {children}
     </AuthContext.Provider>

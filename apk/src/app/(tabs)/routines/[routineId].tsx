@@ -208,7 +208,7 @@ export default function RoutineEditScreen() {
         <View style={styles.content}>
           <View style={styles.headerRow}>
             <Pressable
-              onPress={() => router.replace('/routines')}
+              onPress={() => router.back()}
               hitSlop={12}
               style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}>
               <ThemedText style={styles.backButtonText}>{'<'}</ThemedText>
@@ -238,7 +238,7 @@ export default function RoutineEditScreen() {
               <>
                 <ThemedText style={styles.errorText}>{screenError}</ThemedText>
                 <Pressable
-                  onPress={() => router.replace('/routines')}
+                  onPress={() => router.back()}
                   style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
                   <ThemedText style={styles.buttonText}>Volver al listado</ThemedText>
                 </Pressable>

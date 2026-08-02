@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
 
@@ -13,6 +13,7 @@ import {
   type Habit,
   type RoutineHabitLink,
 } from '@/database';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useAuth } from '@/providers/auth-provider';
 import { useDatabase } from '@/providers/database-provider';
 import { pullRoutineHabitLinks } from '@/services/routine-habit-links-sync';
@@ -44,26 +45,39 @@ export default function RoutineOrganizeScreen() {
       return;
     }
 
-    const routine = await getRoutineById(localRoutineId);
+    try {
+      const routine = await getRoutineById(localRoutineId);
 
-    if (!routine) {
-      setScreenError('No se encontro la rutina.');
+      if (!routine) {
+        setScreenError('No se encontro la rutina.');
+        setIsLoaded(true);
+        return;
+      }
+
+      if (token) {
+        try {
+          await pullRoutineHabitLinks(token);
+        } catch (error) {
+          console.warn('No se pudieron actualizar los habitos de la rutina desde el backend.', error);
+        }
+      }
+
+      const [habitsData, linksData] = await Promise.all([listHabits(), listRoutineHabitLinks()]);
+
+      setRoutineName(routine.nombre);
+      setHabits(habitsData);
+      setRoutineHabitLinks(linksData);
+      setScreenError(null);
+    } catch (error) {
+      setScreenError(
+        error instanceof Error ? error.message : 'No se pudo cargar la organizacion de la rutina.',
+      );
+    } finally {
       setIsLoaded(true);
-      return;
     }
-
-    if (token) {
-      await pullRoutineHabitLinks(token);
-    }
-
-    const [habitsData, linksData] = await Promise.all([listHabits(), listRoutineHabitLinks()]);
-
-    setRoutineName(routine.nombre);
-    setHabits(habitsData);
-    setRoutineHabitLinks(linksData);
-    setScreenError(null);
-    setIsLoaded(true);
   }, [isReady, localRoutineId, token]);
+
+  const { refreshing, handleRefresh } = usePullToRefresh(loadData);
 
   useFocusEffect(
     useCallback(() => {
@@ -134,12 +148,14 @@ export default function RoutineOrganizeScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} />}>
         <View style={styles.container}>
           <View style={styles.content}>
             <View style={styles.headerRow}>
               <Pressable
-                onPress={() => router.replace({ pathname: '/routines/[routineId]', params: { routineId: localRoutineId } })}
+                onPress={() => router.replace('/routines')}
                 hitSlop={12}
                 style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}>
                 <ThemedText style={styles.backButtonText}>{'<'}</ThemedText>
@@ -326,7 +342,7 @@ const styles = StyleSheet.create({
   floatingButtonWrap: {
     position: 'absolute',
     right: 24,
-    bottom: BottomTabInset + 92,
+    bottom: 122,
     minHeight: 52,
     borderRadius: 999,
     backgroundColor: '#1E1E24',

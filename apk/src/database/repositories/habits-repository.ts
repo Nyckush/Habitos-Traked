@@ -134,7 +134,19 @@ export async function deleteHabit(localId: string): Promise<void> {
   );
 }
 
-export async function listHabits(): Promise<Habit[]> {
+export async function hardDeleteHabit(localId: string): Promise<void> {
+  const db = await getDatabase();
+
+  await db.runAsync(
+    `
+      DELETE FROM habitos
+      WHERE local_id = ?;
+    `,
+    [localId],
+  );
+}
+
+export async function listHabits(includePendingDelete = false): Promise<Habit[]> {
   const db = await getDatabase();
 
   const rows = await db.getAllAsync<Habit>(
@@ -149,7 +161,7 @@ export async function listHabits(): Promise<Habit[]> {
         deleted_at,
         sync_status
       FROM habitos
-      WHERE deleted_at IS NULL
+      ${includePendingDelete ? '' : "WHERE deleted_at IS NULL AND sync_status != 'pending_delete'"}
       ORDER BY datetime(created_at) DESC;
     `,
   );
@@ -158,7 +170,7 @@ export async function listHabits(): Promise<Habit[]> {
 }
 
 export async function getHabitByRemoteId(remoteId: number): Promise<Habit | null> {
-  const habits = await listHabits();
+  const habits = await listHabits(true);
 
   return habits.find((habit) => habit.remote_id === remoteId) ?? null;
 }

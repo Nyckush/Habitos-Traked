@@ -100,12 +100,7 @@ export default function ObjectiveCreateNameScreen() {
         <View style={styles.content}>
           <View style={styles.headerRow}>
             <Pressable
-              onPress={() =>
-                router.replace({
-                  pathname: '/metas/[metaId]/plan',
-                  params: { metaId: metaLocalId },
-                })
-              }
+              onPress={() => router.back()}
               hitSlop={12}
               style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}>
               <ThemedText style={styles.backButtonText}>{'<'}</ThemedText>

@@ -1,4 +1,5 @@
 import {
+  hardDeleteHabit,
   listHabits,
   markHabitAsSynced,
   type Habit,
@@ -13,14 +14,24 @@ function shouldSyncHabit(habit: Habit, userRemoteId: number): boolean {
 
 export async function pullHabits(token: string, userRemoteId: number): Promise<void> {
   const response = await habitsApi.list(token);
+  const remoteIds = new Set<number>();
 
   for (const remoteHabit of response.data) {
+    remoteIds.add(remoteHabit.id);
     await upsertHabitFromRemote(remoteHabit, userRemoteId);
+  }
+
+  const localHabits = await listHabits(true);
+
+  for (const localHabit of localHabits) {
+    if (localHabit.remote_id !== null && !remoteIds.has(localHabit.remote_id)) {
+      await hardDeleteHabit(localHabit.local_id);
+    }
   }
 }
 
 export async function syncHabits(token: string, userRemoteId: number): Promise<void> {
-  const localHabits = (await listHabits()).filter((habit) => shouldSyncHabit(habit, userRemoteId));
+  const localHabits = (await listHabits(true)).filter((habit) => shouldSyncHabit(habit, userRemoteId));
 
   const pendingDeletes = localHabits.filter(
     (habit) => habit.sync_status === 'pending_delete' && habit.remote_id !== null,
@@ -35,6 +46,7 @@ export async function syncHabits(token: string, userRemoteId: number): Promise<v
 
   for (const habit of pendingDeletes) {
     await habitsApi.delete(token, habit.remote_id!);
+    await hardDeleteHabit(habit.local_id);
   }
 
   for (const habit of pendingCreates) {

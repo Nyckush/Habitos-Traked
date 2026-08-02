@@ -1,25 +1,62 @@
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { SaveFormat, manipulateAsync } from 'expo-image-manipulator';
+import { Image, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/providers/auth-provider';
 
+function getInitial(username: string | null | undefined): string {
+  const normalized = username?.trim() ?? '';
+
+  return normalized.length > 0 ? normalized[0]!.toUpperCase() : 'U';
+}
+
+async function optimizeProfileImage(
+  asset: Pick<ImagePicker.ImagePickerAsset, 'uri' | 'width' | 'height'>,
+): Promise<string> {
+  const cropSize = Math.min(asset.width, asset.height);
+  const originX = Math.max(0, Math.floor((asset.width - cropSize) / 2));
+  const originY = Math.max(0, Math.floor((asset.height - cropSize) / 2));
+
+  const result = await manipulateAsync(
+    asset.uri,
+    [
+      {
+        crop: {
+          originX,
+          originY,
+          width: cropSize,
+          height: cropSize,
+        },
+      },
+      {
+        resize: {
+          width: 512,
+          height: 512,
+        },
+      },
+    ],
+    {
+      compress: 0.7,
+      format: SaveFormat.JPEG,
+    },
+  );
+
+  return result.uri;
+}
+
 export default function ProfileEditScreen() {
   const { user, updateProfile } = useAuth();
   const usernameInputRef = useRef<TextInput>(null);
   const [username, setUsername] = useState(user?.username ?? '');
-  const [perfil, setPerfil] = useState(user?.perfil ?? '');
+  const [perfil, setPerfil] = useState(user?.perfil ?? null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [usernameFocused, setUsernameFocused] = useState(false);
-  const [perfilFocused, setPerfilFocused] = useState(false);
-  const [usernameLabelAnimation] = useState(() => new Animated.Value((user?.username ?? '').trim().length > 0 ? 1 : 0));
-  const [perfilLabelAnimation] = useState(() => new Animated.Value((user?.perfil ?? '').trim().length > 0 ? 1 : 0));
-  const [usernameUnderlineAnimation] = useState(() => new Animated.Value(0));
-  const [perfilUnderlineAnimation] = useState(() => new Animated.Value(0));
+  const [pickingImage, setPickingImage] = useState(false);
 
   useEffect(() => {
     const timerId = setTimeout(() => {
@@ -29,41 +66,37 @@ export default function ProfileEditScreen() {
     return () => clearTimeout(timerId);
   }, []);
 
-  useEffect(() => {
-    Animated.timing(usernameLabelAnimation, {
-      toValue: usernameFocused || username.trim().length > 0 ? 1 : 0,
-      duration: 180,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }).start();
-  }, [username, usernameFocused, usernameLabelAnimation]);
+  async function handlePickImage() {
+    try {
+      setPickingImage(true);
+      setError(null);
 
-  useEffect(() => {
-    Animated.timing(perfilLabelAnimation, {
-      toValue: perfilFocused || perfil.trim().length > 0 ? 1 : 0,
-      duration: 180,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }).start();
-  }, [perfil, perfilFocused, perfilLabelAnimation]);
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-  useEffect(() => {
-    Animated.timing(usernameUnderlineAnimation, {
-      toValue: usernameFocused ? 1 : 0,
-      duration: 180,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }).start();
-  }, [usernameFocused, usernameUnderlineAnimation]);
+      if (!permission.granted) {
+        setError('Necesitamos permiso para abrir tu galeria.');
+        return;
+      }
 
-  useEffect(() => {
-    Animated.timing(perfilUnderlineAnimation, {
-      toValue: perfilFocused ? 1 : 0,
-      duration: 180,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }).start();
-  }, [perfilFocused, perfilUnderlineAnimation]);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (result.canceled || !result.assets[0]?.uri) {
+        return;
+      }
+
+      const optimizedUri = await optimizeProfileImage(result.assets[0]);
+      setPerfil(optimizedUri);
+    } catch (imageError) {
+      setError(imageError instanceof Error ? imageError.message : 'No se pudo abrir la galeria.');
+    } finally {
+      setPickingImage(false);
+    }
+  }
 
   async function handleSaveProfile() {
     if (!username.trim()) {
@@ -77,7 +110,7 @@ export default function ProfileEditScreen() {
 
       await updateProfile({
         username,
-        perfil: perfil.trim() || null,
+        perfil,
       });
 
       router.replace('/profile');
@@ -94,7 +127,7 @@ export default function ProfileEditScreen() {
         <View style={styles.content}>
           <View style={styles.headerRow}>
             <Pressable
-              onPress={() => router.replace('/profile')}
+              onPress={() => router.back()}
               hitSlop={12}
               style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}>
               <ThemedText style={styles.backButtonText}>{'<'}</ThemedText>
@@ -110,7 +143,7 @@ export default function ProfileEditScreen() {
               </View>
 
               <ThemedText themeColor="textSecondary" style={styles.headerSubtitle}>
-                Modifica username y foto de perfil
+                Cambia tu username y elige una foto desde la galeria
               </ThemedText>
             </View>
 
@@ -118,122 +151,75 @@ export default function ProfileEditScreen() {
           </View>
 
           <View style={styles.formCard}>
+            <View style={styles.avatarSection}>
+              {perfil ? (
+                <Image source={{ uri: perfil }} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.avatarFallback}>
+                  <ThemedText style={styles.avatarFallbackText}>{getInitial(username)}</ThemedText>
+                </View>
+              )}
+
+              <View style={styles.avatarActions}>
+                <Pressable
+                  disabled={submitting || pickingImage}
+                  onPress={() => void handlePickImage()}
+                  style={({ pressed }) => [
+                    styles.button,
+                    styles.secondaryCardButton,
+                    pressed && styles.buttonPressed,
+                    (submitting || pickingImage) && styles.buttonDisabled,
+                  ]}>
+                  <MaterialDesignIcons name="image-outline" size={18} color="#FFFFFF" />
+                  <ThemedText style={styles.buttonText}>
+                    {pickingImage ? 'Abriendo galeria...' : 'Elegir foto'}
+                  </ThemedText>
+                </Pressable>
+
+                {perfil ? (
+                  <Pressable
+                    disabled={submitting || pickingImage}
+                    onPress={() => setPerfil(null)}
+                    style={({ pressed }) => [
+                      styles.removeButton,
+                      pressed && styles.buttonPressed,
+                      (submitting || pickingImage) && styles.buttonDisabled,
+                    ]}>
+                    <MaterialDesignIcons name="trash-can-outline" size={18} color="#FCA5A5" />
+                    <ThemedText style={styles.removeButtonText}>Quitar foto</ThemedText>
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+
             <View style={styles.inputGroup}>
-              <Animated.Text
-                pointerEvents="none"
-                style={[
-                  styles.floatingLabel,
-                  {
-                    color: usernameFocused || username.trim().length > 0 ? '#E4E4E7' : '#A1A1AA',
-                    transform: [
-                      {
-                        translateY: usernameLabelAnimation.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [20, 2],
-                        }),
-                      },
-                      {
-                        scale: usernameLabelAnimation.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [1, 0.78],
-                        }),
-                      },
-                    ],
-                  },
-                ]}>
+              <ThemedText themeColor="textSecondary" style={styles.inputLabel}>
                 Username
-              </Animated.Text>
+              </ThemedText>
 
               <TextInput
                 ref={usernameInputRef}
                 style={styles.input}
                 value={username}
                 onChangeText={setUsername}
-                onFocus={() => setUsernameFocused(true)}
-                onBlur={() => setUsernameFocused(false)}
-              />
-
-              <View style={styles.inputLineBase} />
-              <Animated.View
-                style={[
-                  styles.inputLineActive,
-                  {
-                    opacity: usernameUnderlineAnimation,
-                    transform: [
-                      {
-                        scaleX: usernameUnderlineAnimation.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0.35, 1],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Animated.Text
-                pointerEvents="none"
-                style={[
-                  styles.floatingLabel,
-                  {
-                    color: perfilFocused || perfil.trim().length > 0 ? '#E4E4E7' : '#A1A1AA',
-                    transform: [
-                      {
-                        translateY: perfilLabelAnimation.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [20, 2],
-                        }),
-                      },
-                      {
-                        scale: perfilLabelAnimation.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [1, 0.78],
-                        }),
-                      },
-                    ],
-                  },
-                ]}>
-                Foto de perfil URL
-              </Animated.Text>
-
-              <TextInput
-                style={styles.input}
-                value={perfil}
-                onChangeText={setPerfil}
-                onFocus={() => setPerfilFocused(true)}
-                onBlur={() => setPerfilFocused(false)}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-
-              <View style={styles.inputLineBase} />
-              <Animated.View
-                style={[
-                  styles.inputLineActive,
-                  {
-                    opacity: perfilUnderlineAnimation,
-                    transform: [
-                      {
-                        scaleX: perfilUnderlineAnimation.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0.35, 1],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
+                placeholder="Tu username"
+                placeholderTextColor="#71717A"
               />
             </View>
 
             {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
 
             <Pressable
-              disabled={submitting}
+              disabled={submitting || pickingImage}
               onPress={handleSaveProfile}
-              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, submitting && styles.buttonDisabled]}>
-              <ThemedText style={styles.buttonText}>{submitting ? 'Guardando...' : 'Guardar cambios'}</ThemedText>
+              style={({ pressed }) => [
+                styles.button,
+                pressed && styles.buttonPressed,
+                (submitting || pickingImage) && styles.buttonDisabled,
+              ]}>
+              <ThemedText style={styles.buttonText}>
+                {submitting ? 'Guardando...' : 'Guardar cambios'}
+              </ThemedText>
             </Pressable>
           </View>
         </View>
@@ -292,49 +278,89 @@ const styles = StyleSheet.create({
   },
   formCard: {
     marginTop: 24,
-    gap: 16,
+    gap: 18,
     borderWidth: 1,
     borderColor: '#27272A',
     borderRadius: 12,
     padding: 16,
     backgroundColor: '#18181B',
   },
-  inputGroup: {
-    position: 'relative',
-    paddingTop: 6,
-    paddingBottom: 2,
+  avatarSection: {
+    alignItems: 'center',
+    gap: 14,
   },
-  floatingLabel: {
-    position: 'absolute',
-    left: 0,
-    zIndex: 1,
+  avatarImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 999,
+    backgroundColor: '#0A0A0C',
+    borderWidth: 1,
+    borderColor: '#27272A',
+  },
+  avatarFallback: {
+    width: 120,
+    height: 120,
+    borderRadius: 999,
+    backgroundColor: '#0A0A0C',
+    borderWidth: 1,
+    borderColor: '#27272A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarFallbackText: {
+    fontSize: 40,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  avatarActions: {
+    width: '100%',
+    gap: 10,
+  },
+  inputGroup: {
+    gap: 8,
+  },
+  inputLabel: {
+    fontSize: 13,
   },
   input: {
-    paddingHorizontal: 0,
-    paddingTop: 24,
-    paddingBottom: 8,
-    fontSize: 16,
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: '#3F3F46',
+    borderRadius: 10,
+    paddingHorizontal: 14,
     color: '#FFFFFF',
-    backgroundColor: 'transparent',
-  },
-  inputLineBase: {
-    height: 1,
-    backgroundColor: '#3F3F46',
-  },
-  inputLineActive: {
-    position: 'absolute',
-    right: 0,
-    bottom: 2,
-    left: 0,
-    height: 2,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#111115',
+    fontSize: 16,
   },
   button: {
     minHeight: 48,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: '#1E1E24',
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  secondaryCardButton: {
+    borderWidth: 1,
+    borderColor: '#27272A',
+  },
+  removeButton: {
+    minHeight: 46,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#7F1D1D',
+    backgroundColor: '#2A1114',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  removeButtonText: {
+    color: '#FCA5A5',
+    fontWeight: '700',
   },
   buttonPressed: {
     opacity: 0.85,

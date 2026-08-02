@@ -49,7 +49,11 @@ export default function RoutineSelectableHabitsScreen() {
     }
 
     if (token) {
-      await pullRoutineHabitLinks(token);
+      try {
+        await pullRoutineHabitLinks(token);
+      } catch (error) {
+        console.warn('No se pudieron actualizar los habitos disponibles desde el backend.', error);
+      }
     }
 
     const [habitsData, linksData] = await Promise.all([listHabits(), listRoutineHabitLinks()]);
