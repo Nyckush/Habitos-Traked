@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -81,6 +82,41 @@ class AuthController extends Controller
         ]);
     }
 
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'username' => ['required', 'string', 'max:255'],
+            'perfil' => ['nullable', 'image', 'max:5120'],
+            'remove_profile_photo' => ['nullable', 'boolean'],
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+        $user->username = $data['username'];
+
+        $shouldRemovePhoto = (bool) ($data['remove_profile_photo'] ?? false);
+
+        if ($shouldRemovePhoto && filled($user->perfil)) {
+            $this->deleteStoredProfilePhoto($user->perfil);
+            $user->perfil = null;
+        }
+
+        if ($request->hasFile('perfil')) {
+            if (filled($user->perfil)) {
+                $this->deleteStoredProfilePhoto($user->perfil);
+            }
+
+            $user->perfil = $request->file('perfil')->store("profiles/{$user->id}", 'public');
+        }
+
+        $user->save();
+
+        return response()->json([
+            'message' => 'Perfil actualizado correctamente.',
+            'user' => $this->userPayload($user->fresh()),
+        ]);
+    }
+
     /**
      * @return array{id:int,username:string,perfil:?string,email:string,created_at:?string,updated_at:?string}
      */
@@ -89,10 +125,40 @@ class AuthController extends Controller
         return [
             'id' => $user->id,
             'username' => $user->username,
-            'perfil' => $user->perfil,
+            'perfil' => $this->profileUrl($user->perfil),
             'email' => $user->email,
             'created_at' => $user->created_at?->toISOString(),
             'updated_at' => $user->updated_at?->toISOString(),
         ];
+    }
+
+    private function profileUrl(?string $path): ?string
+    {
+        if (blank($path)) {
+            return null;
+        }
+
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+
+        if (str_starts_with($path, '/storage/')) {
+            return request()->getSchemeAndHttpHost() . $path;
+        }
+
+        return request()->getSchemeAndHttpHost() . Storage::disk('public')->url($path);
+    }
+
+    private function deleteStoredProfilePhoto(string $path): void
+    {
+        if (
+            str_starts_with($path, 'http://')
+            || str_starts_with($path, 'https://')
+            || str_starts_with($path, '/storage/')
+        ) {
+            return;
+        }
+
+        Storage::disk('public')->delete($path);
     }
 }
